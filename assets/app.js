@@ -202,6 +202,7 @@ const S = {
   read: {},   // chatId -> true once opened (clears unread)
   selMode: false, sel: new Set(), csearch: null,
   archiveView: false,
+  unreadAt: null,   // index of first unread message in the open chat (Telegram divider)
 };
 const PINS = { team: 3 };  // chatId -> pinned message index
 
@@ -374,7 +375,13 @@ function renderConversation(){
      <div class="chat-scroll${S.selMode?' is-selmode':''}" id="scroll">${renderMessages(c)}</div>
      <button class="chat-jump" id="chatJump" title="Вниз" style="display:none">${ic('arrow-down')}</button>
      ${bottom}`;
-  const sc = $('#scroll'); if (sc && S.csearch==null){ sc.scrollTop = sc.scrollHeight; requestAnimationFrame(()=>{ if(sc.isConnected) sc.scrollTop = sc.scrollHeight; }); }
+  const sc = $('#scroll');
+  if (sc && S.csearch==null){
+    const toPos = () => { const sep=sc.querySelector('.chat-unread-sep');
+      if(sep){ const scr=sc.getBoundingClientRect(), sr=sep.getBoundingClientRect(); sc.scrollTop += (sr.top - scr.top) - 56; }
+      else sc.scrollTop = sc.scrollHeight; };
+    toPos(); requestAnimationFrame(()=>{ if(sc.isConnected) toPos(); });
+  }
   if (sc){ const jump=$('#chatJump'); const upd=()=>{ if(jump) jump.style.display = (sc.scrollHeight - sc.scrollTop - sc.clientHeight > 160) ? '' : 'none'; }; sc.addEventListener('scroll', upd); }
   if (S.csearch!=null){ const ci=$('#csIn'); if(ci){ ci.focus(); ci.setSelectionRange(ci.value.length,ci.value.length); } updateCSCount(); }
 }
@@ -390,6 +397,7 @@ function renderMessages(c){
   const th = threadOf(c);
   let html = '', lastFrom = null, lastDay = null;
   th.forEach((m,i)=>{
+    if (S.unreadAt!=null && i===S.unreadAt && i>0){ html += `<div class="chat-unread-sep"><span>Непрочитанные сообщения</span></div>`; lastFrom=null; }
     if (m.service){ html += `<div class="chat-service">${m.text}</div>`; lastFrom=null; return; }
     if (m.day && m.day!==lastDay){ html += `<div class="chat-daysep">${esc(m.day)}</div>`; lastDay=m.day; lastFrom=null; }
     const out = m.from==='me';
@@ -894,7 +902,8 @@ function groupAdminModal(chatId){
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
 function openChat(id){
   S.chatId = id; S.reply=null; S.editId=null;
-  const c = findChat(id); if(c){ S.read[id]=true; c.unread=0; c.typing=null; }
+  const c = findChat(id);
+  if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.read[id]=true; c.unread=0; c.typing=null; }
   renderList(); renderFolders(); renderWorkspace(); renderConversation(); renderInfo();
   $('#chatBody').setAttribute('data-mobile','chat');
   syncURL();
@@ -1304,9 +1313,11 @@ function boot(){
   if (S.org!=='all' && !ORGS[S.org]) { S.org='sut'; localStorage.setItem('sut-chat:org','sut'); document.documentElement.removeAttribute('data-org'); }
   if (P.get('view')==='join'){ renderJoin(P.get('req')!=='0'); return; }
   if (P.get('view')==='settings'){ renderAll(); renderSettings(P.get('sec')); return; }
-  renderAll();
+  // openChat is a superset of renderAll — run it FIRST so it captures the unread
+  // anchor before any render marks the chat read (else the divider never appears).
   if (S.chatId && findChat(S.chatId)) openChat(S.chatId);
-  else if (innerWidth>900){ /* auto-open first chat on desktop for a full first impression */ openChat(chatsFor(S.org)[0].id); }
+  else if (innerWidth>900 && chatsFor(S.org)[0]){ /* auto-open first chat on desktop for a full first impression */ openChat(chatsFor(S.org)[0].id); }
+  else renderAll();
   if (P.get('call') && findChat(S.chatId)) callOverlay(S.chatId, P.get('call'));
 }
 boot();
