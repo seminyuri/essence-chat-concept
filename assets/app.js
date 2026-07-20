@@ -465,12 +465,14 @@ function updateCSCount(){
   const marks = $$('#scroll .chat-hl'); const el=$('#csCount');
   S._csMarks = marks; S._csIdx = 0;
   if (el) el.textContent = marks.length ? '1/'+marks.length : (S.csearch?'0':'');
-  if (marks.length) marks[0].scrollIntoView({block:'center'});
+  marks.forEach(m=>m.classList.remove('is-current'));
+  if (marks.length){ marks[0].classList.add('is-current'); marks[0].scrollIntoView({block:'center'}); }
 }
 function csNav(dir){
   const marks = S._csMarks||[]; if(!marks.length) return;
   S._csIdx = (S._csIdx + dir + marks.length) % marks.length;
-  const m = marks[S._csIdx]; if(m){ m.scrollIntoView({block:'center'}); }
+  marks.forEach(m=>m.classList.remove('is-current'));
+  const m = marks[S._csIdx]; if(m){ m.classList.add('is-current'); m.scrollIntoView({block:'center'}); }
   const el=$('#csCount'); if(el) el.textContent=(S._csIdx+1)+'/'+marks.length;
 }
 function flashMsg(mid){ const el=$(`.msg[data-mid="${mid}"]`); if(el){ el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash'); el.scrollIntoView({block:'center'}); setTimeout(()=>el.classList.remove('is-flash'),1200); } }
