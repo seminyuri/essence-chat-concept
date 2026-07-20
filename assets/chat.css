@@ -514,6 +514,12 @@ html, body { height: 100%; overflow: hidden; }
 .jn__ok-seal::before { content:""; position: absolute; inset: 26px; border-radius: 50%; background: var(--color-accent); z-index:1; }
 .jn__ok-check { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--color-accent-on); }
 
+/* sticker + bare bubble + message-in animation */
+.msg__sticker { font-size: 64px; line-height: 1; padding: 2px 0; }
+.msg__bubble--bare { background: none !important; border: none !important; box-shadow: none !important; padding: 0 2px !important; }
+.msg-in { animation: msg-in var(--motion-duration-base) var(--ease-spring); }
+@keyframes msg-in { from { opacity: 0; transform: translateY(9px) scale(.98); } to { opacity: 1; transform: none; } }
+
 /* ════════════════════════ PINNED BAR / IN-CHAT SEARCH ════════════════════════ */
 .chat-pinned { position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 11px; padding: 7px 12px 7px 16px;
                background: var(--bg-glass); backdrop-filter: blur(12px); border-bottom: var(--hairline-width) solid var(--color-border); cursor: pointer; }

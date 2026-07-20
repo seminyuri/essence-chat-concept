@@ -25,6 +25,7 @@ const U = {
   sveta: { name:'Света (Юг)',       s:'С',  av:'d', pr:'online',   bio:'Смена · Филиал Юг' },
   igor:  { name:'Игорь · Рыба Норд', s:'РН', av:'c', kind:'external', via:'MAX', bio:'Поставщик · Рыба Норд', natal:null },
   lena:  { name:'Лена (Изумрудиум)', s:'Л', av:'f', pr:'online' },
+  chan:  { name:'Суть · Анонсы', s:'📣', av:'e', kind:'channel' },
 };
 const AVATAR = (u) => `<span class="chat-avatar chat-avatar--${u.av}">${esc(u.s)}${u.pr?`<span class="chat-avatar__presence${u.pr==='online'?' chat-avatar__presence--online':''}"></span>`:''}</span>`;
 const presenceLabel = (u) => u.kind==='bot' ? 'бот' : u.pr==='online' ? 'в сети' : u.pr==='recently' ? 'был(а) недавно' : 'был(а) сегодня';
@@ -45,7 +46,7 @@ const CHATS = {
       last:{by:'mark', txt:'Собираемся в 15:00 у Веры', t:'14:20'}, unread:3, typing:'vera' },
     { id:'maria', type:'client',  title:'Мария Кольцова', user:'maria', av:'e', s:'МК', folder:'clients',
       last:{by:'maria', txt:'🎤 Голосовое · 0:07', t:'14:37'}, unread:1 },
-    { id:'alena', type:'dm',      title:'Алёна Ри', user:'alena', av:'h', s:'АР', folder:'work',
+    { id:'alena', type:'dm',      title:'Алёна Ри', user:'alena', av:'h', s:'АР', folder:'work', draft:'Спасибо! Гляну сегодня к вечеру',
       last:{by:'alena', txt:'Разбор Марии готовлю к четвергу', t:'13:05'}, unread:0 },
     { id:'announce', type:'channel', title:'Суть · Анонсы', av:'e', s:'📣', icon:'hash', muted:true,
       last:{by:'sys', txt:'Релиз v3 выкатили 🎉', t:'вчера'}, unread:0, subscribers:214 },
@@ -92,6 +93,7 @@ const MSGS = {
     { from:'me',   t:'14:35', media:{grad:'e'}, cap:'client-360.png' },
     { from:'anya', t:'14:37', text:'Огонь. Забираю в поддержку.', reacts:[{e:'🔥', by:['me','vera'], mine:true}] },
     { from:'me',   t:'14:38', text:'Отправила Марии новую ссылку ✓', read:true },
+    { from:'anya', t:'14:39', sticker:'🙏' },
   ],
   team: [
     { from:'vera', day:'Сегодня', t:'13:40', text:'Команда, в 15:00 короткий синк по онбордингу клиентов через чат.' },
@@ -135,6 +137,11 @@ const MSGS = {
   ],
   yuia: [
     { from:'yuia', t:'вчера', text:'Привет! Я Юя — помогу найти сообщение, собрать саммари чата или составить ответ. Просто напиши.' },
+  ],
+  announce: [
+    { from:'chan', day:'Вчера', t:'18:00', text:'🎉 Релиз v3 выкатили! Онбординг клиентов через чат — специалисты уже тестируют.', views:214, reacts:[{e:'🎉',by:['me','anya','mark'],mine:true},{e:'🔥',by:['vera'],mine:false}] },
+    { from:'chan', t:'18:02', media:{grad:'e'}, cap:'Новый экран приглашения клиента', views:201 },
+    { from:'chan', day:'Сегодня', t:'10:00', text:'Напоминание: в пятницу общий созвон по итогам недели, 17:00.', views:158 },
   ],
 };
 function lightThread(c){
@@ -227,7 +234,8 @@ function renderList(){
     const unread = S.read[c.id]?0:(c.unread||0);
     const u = userOf(c);
     let snip='';
-    if (c.typing && !S.read[c.id]) snip = `<span class="chat-row__snip chat-row__snip--typing">${esc(U[c.typing].name.split(' ')[0])} печатает…</span>`;
+    if (c.draft && !S.read[c.id]) snip = `<span class="chat-row__snip chat-row__snip--draft">Черновик: ${esc(c.draft)}</span>`;
+    else if (c.typing && !S.read[c.id]) snip = `<span class="chat-row__snip chat-row__snip--typing">${esc(U[c.typing].name.split(' ')[0])} печатает…</span>`;
     else {
       const pre = c.type==='group' && c.last.by!=='me' && c.last.by!=='sys' ? `<b>${esc((U[c.last.by]||{name:c.last.by}).name.split(' ')[0])}:</b> ` : (c.last.by==='me'?'Вы: ':'');
       snip = `<span class="chat-row__snip">${pre}${esc(c.last.txt)}</span>`;
@@ -352,7 +360,8 @@ function renderMessages(c){
     if (m.link) body += `<div class="msg__linkprev"><span class="msg__linkprev-ic">${ic(m.link.ic||'link')}</span><div style="min-width:0"><div class="msg__linkprev-t">${esc(m.link.title)}</div><div class="msg__linkprev-d">${esc(m.link.desc)}</div></div></div>`;
     // meta
     let meta = `<span class="msg__meta">${m.edited?'<span class="msg__edited">изм. · </span>':''}${esc(m.t)}`;
-    if (out){
+    if (c.type==='channel' && m.views) meta += ` <span class="msg__readcount">${ic('eye','icon--xs')}${m.views}</span>`;
+    else if (out){
       if (m.readBy && c.type==='group') meta += ` <span class="msg__readcount" data-readby='${esc(JSON.stringify(m.readBy))}'>${ic('eye','icon--xs')}${m.readBy.length}</span>`;
       else meta += ` <span class="chat-tick">${ic(m.read?'checks':'check')}</span>`;
     }
@@ -362,10 +371,13 @@ function renderMessages(c){
     const hover = `<div class="msg__hover"><button data-quick-react title="Реакция">${ic('smile','icon--sm')}</button><button data-quick-reply title="Ответить">${ic('reply','icon--sm')}</button><button data-quick-menu title="Ещё">${ic('dots-h','icon--sm')}</button></div>`;
     const mid = m.id || (m.id = 'm'+i);
     const selCls = S.sel.has(mid) ? ' is-selected' : '';
+    const bare = m.sticker ? ' msg__bubble--bare' : '';
+    if (m.sticker) body = `<div class="msg__sticker">${m.sticker}</div>`;
+    const showAva = !out && c.type!=='channel';
     html += `<div class="msg msg--${out?'out':'in'}${grouped?' is-grouped':''}${selCls}" data-mid="${mid}">
       <div class="msg__sel">${ic('check')}</div>
-      ${!out?`<div class="msg__avatar">${AVATAR(from)}</div>`:''}
-      <div class="msg__col"><div class="msg__bubble">${body}${meta}</div>${reacts}${hover}</div>
+      ${showAva?`<div class="msg__avatar">${AVATAR(from)}</div>`:''}
+      <div class="msg__col"><div class="msg__bubble${bare}">${body}${meta}</div>${reacts}${hover}</div>
     </div>`;
   });
   return html;
@@ -808,6 +820,7 @@ function send(){
   else th.push({ id:'m'+uid(), from:'me', t:nowT(), text:v, read:false, replyTo:S.reply?{who:S.reply.who,txt:S.reply.txt}:null });
   c.last={by:'me',txt:v,t:nowT(),read:false}; S.reply=null;
   renderConversation(); renderList();
+  { const _sc=$('#scroll'); if(_sc) _sc.lastElementChild?.classList.add('msg-in'); }
   // fake delivered→read + a reply for demo liveliness
   const last = th[th.length-1];
   setTimeout(()=>{ last.read=true; if(S.chatId===c.id) renderConversation(); }, 1400);
@@ -870,6 +883,7 @@ document.addEventListener('click', e=>{
   if (t.closest('[data-natal]')){ toggleInfo(true); return; }
   // composer
   if (t.closest('#cmpSend')){ send(); return; }
+  { const so=t.closest('[data-sendopt]'); if(so){ closeOverlays(); if($('#cmpInput')?.value.trim()) send(); toast(so.dataset.sendopt==='silent'?'Отправлено без звука':'Запланировано на завтра, 09:00'); return; } }
   if (t.closest('[data-clear-reply]')){ clearReply(); return; }
   if (t.closest('[data-emoji]')){ emojiPicker(null); return; }
   if (t.closest('[data-attach]')){ const r=t.closest('[data-attach]').getBoundingClientRect(); attachMenu(r.left,r.top); return; }
@@ -885,7 +899,10 @@ document.addEventListener('click', e=>{
   const rc=t.closest('[data-readby]'); if(rc){ const r=rc.getBoundingClientRect(); readByPopover(JSON.parse(rc.dataset.readby), r.left, r.bottom); return; }
 });
 // context menu on right-click of a message
-document.addEventListener('contextmenu', e=>{ const m=e.target.closest('.msg'); if(m){ e.preventDefault(); contextMenu(m.dataset.mid, e.clientX, e.clientY); } });
+document.addEventListener('contextmenu', e=>{
+  if (e.target.closest('#cmpSend')){ e.preventDefault(); const r=e.target.closest('#cmpSend').getBoundingClientRect(); popover(`<div class="menu" style="min-width:214px"><button class="menu__item" data-sendopt="silent">${ic('mute','icon--sm')} Отправить без звука</button><button class="menu__item" data-sendopt="schedule">${ic('clock','icon--sm')} Отправить позже</button></div>`, r.right-214, r.top-96); return; }
+  const m=e.target.closest('.msg'); if(m){ e.preventDefault(); contextMenu(m.dataset.mid, e.clientX, e.clientY); }
+});
 // list search
 $('#listSearch').addEventListener('input', e=>{ S.search=e.target.value; renderList(); });
 // composer: enter to send, autosize
