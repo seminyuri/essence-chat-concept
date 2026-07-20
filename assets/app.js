@@ -603,11 +603,20 @@ function cmdk(){
       <div id="ckList" style="overflow:auto;padding:6px"></div>
     </div></div>`;
   OV.innerHTML = html;
+  const orgOf = cid => { for(const o in CHATS) if(CHATS[o].find(x=>x.id===cid)) return o; return 'sut'; };
+  const ckChat = (c,o) => `<button class="menu__item" data-ck="${c.id}" data-ck-org="${o}"><span class="chat-avatar chat-avatar--${c.av}" style="width:32px;height:32px;font-size:12px">${c.av==='saved'?ic('bookmark','icon--sm'):esc(c.s)}</span><span style="flex:1;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.title)}</span><span style="font-size:10px;color:var(--color-fg-subtle);font-family:var(--type-mono)">${esc(ORGS[o].name)}</span></button>`;
   const render = q=>{
-    const all=[]; for(const o in CHATS) CHATS[o].forEach(c=>all.push({...c,org:o}));
-    const res = all.filter(c=>!q||c.title.toLowerCase().includes(q.toLowerCase())).slice(0,8);
-    $('#ckList').innerHTML = (q?'':`<div class="menu__label">Быстрые действия</div><button class="menu__item" data-ck-cmd="new">${ic('pen','icon--sm')} Новый чат</button><button class="menu__item" data-ck-cmd="invite">${ic('user-plus','icon--sm')} Пригласить клиента по ссылке</button><div class="menu__label">Чаты</div>`)
-      + res.map(c=>`<button class="menu__item" data-ck="${c.id}" data-ck-org="${c.org}">${chatAvatar(c).replace(/chat-avatar--\w/, m=>m).replace('48px','')}<span style="flex:1;text-align:left">${esc(c.title)}</span><span style="font-size:10px;color:var(--color-fg-subtle);font-family:var(--type-mono)">${esc(ORGS[c.org].name)}</span></button>`).join('');
+    const ql=(q||'').trim().toLowerCase();
+    if(!ql){ $('#ckList').innerHTML = `<div class="menu__label">Быстрые действия</div><button class="menu__item" data-ck-cmd="new">${ic('pen','icon--sm')} Новый чат</button><button class="menu__item" data-ck-cmd="invite">${ic('user-plus','icon--sm')} Пригласить клиента по ссылке</button><div class="menu__label">Недавние</div>` + chatsFor(S.org).slice(0,5).map(c=>ckChat(c,orgOf(c.id))).join(''); return; }
+    let html='';
+    const chats=[]; for(const o in CHATS) for(const c of CHATS[o]){ if(c.title.toLowerCase().includes(ql)) chats.push([c,o]); }
+    if(chats.length) html+=`<div class="menu__label">Чаты</div>`+chats.slice(0,5).map(([c,o])=>ckChat(c,o)).join('');
+    const people=Object.entries(U).filter(([id,u])=>id!=='me'&&id!=='chan'&&u.name.toLowerCase().includes(ql));
+    if(people.length) html+=`<div class="menu__label">Люди</div>`+people.slice(0,5).map(([id,u])=>`<button class="menu__item" data-ckperson="${id}"><span class="chat-avatar chat-avatar--${u.av}" style="width:32px;height:32px;font-size:12px">${esc(u.s)}</span><span style="flex:1;text-align:left">${esc(u.name)}</span><span style="font-size:10px;color:var(--color-fg-subtle)">${esc(presenceLabel(u))}</span></button>`).join('');
+    const msgs=[]; outer: for(const cid in MSGS){ for(const m of MSGS[cid]){ if(m.text && m.text.toLowerCase().includes(ql)){ msgs.push([cid,m]); if(msgs.length>=6) break outer; } } }
+    if(msgs.length) html+=`<div class="menu__label">Сообщения</div>`+msgs.map(([cid,m])=>{ const c=findChat(cid); return `<button class="menu__item" data-ckmsg="${cid}" data-ckmid="${m.id||''}" data-ck-org="${orgOf(cid)}"><span class="shell-bell__icon shell-bell__icon--muted" style="width:30px;height:30px;border-radius:9px;flex:none">${ic('message','icon--sm')}</span><span style="flex:1;min-width:0;text-align:left"><span style="display:block;font-size:11.5px;color:var(--color-fg-subtle)">${esc(c?c.title:'')}</span><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.text)}</span></span></button>`; }).join('');
+    if(!html) html=`<div class="empty-state" style="padding:28px 16px"><div class="empty-state__description">Ничего не найдено</div></div>`;
+    $('#ckList').innerHTML=html;
   };
   render('');
   const inp=$('#ckIn'); inp.focus();
@@ -615,6 +624,8 @@ function cmdk(){
   OV.querySelector('.modal-back').addEventListener('click',e=>{ if(e.target.classList.contains('modal-back'))closeOverlays();
     const c=e.target.closest('[data-ck]'); if(c){ S.org=c.dataset.ckOrg; localStorage.setItem('sut-chat:org',S.org); closeOverlays(); renderAll(); openChat(c.dataset.ck); }
     const cmd=e.target.closest('[data-ck-cmd]'); if(cmd){ closeOverlays(); cmd.dataset.ckCmd==='invite'?inviteModal():newChatMenu(); }
+    const pp=e.target.closest('[data-ckperson]'); if(pp){ closeOverlays(); startDM(pp.dataset.ckperson); }
+    const mm=e.target.closest('[data-ckmsg]'); if(mm){ S.org=mm.dataset.ckOrg; localStorage.setItem('sut-chat:org',S.org); closeOverlays(); renderAll(); openChat(mm.dataset.ckmsg); if(mm.dataset.ckmid) setTimeout(()=>flashMsg(mm.dataset.ckmid),180); }
   });
 }
 
@@ -850,6 +861,27 @@ function syncURL(){ const p=new URLSearchParams(); if(S.org!=='sut')p.set('ws',S
 
 function renderAll(){ renderWorkspace(); renderFolders(); renderList(); renderConversation(); renderInfo(); }
 
+/* keyboard navigation */
+function visibleChats(){
+  const list = chatsFor(S.org).filter(c=>{
+    if (S.folder==='unread') return !S.read[c.id] && c.unread>0;
+    if (S.folder!=='all') return c.folder===S.folder;
+    return true;
+  }).filter(c=>!S.search || (c.title+' '+(c.last?.txt||'')).toLowerCase().includes(S.search.toLowerCase()));
+  return [...list.filter(c=>c.pinned), ...list.filter(c=>!c.pinned)];
+}
+function navChat(dir){
+  const list=visibleChats(); if(!list.length) return;
+  let i=list.findIndex(c=>c.id===S.chatId);
+  i = i<0 ? (dir>0?0:list.length-1) : Math.max(0, Math.min(list.length-1, i+dir));
+  openChat(list[i].id);
+}
+function shortcutsOverlay(){
+  const rows=[['J / K','Следующий / предыдущий чат'],['/  ·  ⌘K','Поиск и команды'],['Enter','Отправить сообщение'],['Shift + Enter','Новая строка'],['ПКМ по сообщению','Реакции и действия'],['Esc','Закрыть / отменить'],['?','Эта шпаргалка']];
+  modal(`<div class="modal__header"><div class="modal__title">Горячие клавиши</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body"><div class="set__card">${rows.map(r=>`<div class="set__item"><div class="set__item-b"><div class="set__item-t">${esc(r[1])}</div></div><kbd class="kbd" style="height:auto;padding:3px 9px">${esc(r[0])}</kbd></div>`).join('')}</div></div>`,'sm');
+}
+
 /* ─────────────────────────── EVENTS ─────────────────────────── */
 document.addEventListener('click', e=>{
   const t = e.target;
@@ -925,6 +957,15 @@ document.addEventListener('keydown', e=>{
   if (e.key==='Escape'){ document.querySelector('.lightbox')?.remove(); closeOverlays(); return; }
   if (e.target.id==='cmpInput'){
     if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+    return;
+  }
+  const inField = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
+  if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey){
+    const k=e.key.toLowerCase();
+    if (k==='j'){ e.preventDefault(); navChat(1); return; }
+    if (k==='k'){ e.preventDefault(); navChat(-1); return; }
+    if (e.key==='/'){ e.preventDefault(); cmdk(); return; }
+    if (e.key==='?'){ e.preventDefault(); shortcutsOverlay(); return; }
   }
 });
 document.addEventListener('input', e=>{
@@ -1120,6 +1161,7 @@ function renderJoin(req){
 
 /* ─────────────────────────── BOOT ─────────────────────────── */
 function boot(){
+  for(const cid in MSGS) MSGS[cid].forEach((m,i)=>{ if(!m.id) m.id='m'+i; });
   if (P.get('view')==='join'){ renderJoin(P.get('req')!=='0'); return; }
   if (P.get('view')==='settings'){ renderAll(); renderSettings(P.get('sec')); return; }
   renderAll();
