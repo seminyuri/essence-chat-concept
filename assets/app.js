@@ -451,9 +451,9 @@ function renderMessages(c){
   }
   return html;
 }
-function linkify(t){ return esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a href="#" style="color:var(--color-accent-strong)">@$1</a>'); }
+function linkify(t){ return esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a class="msg-mention" data-mention-jump="$1">@$1</a>'); }
 function renderText(raw){
-  let s = esc(raw).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a href="#" style="color:var(--color-accent-strong)">@$1</a>');
+  let s = esc(raw).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a class="msg-mention" data-mention-jump="$1">@$1</a>');
   if (S.csearch){ const q=S.csearch.trim(); if(q){ try{ const rx=new RegExp('('+esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')(?![^<]*>)','gi'); s=s.replace(rx,'<mark class="chat-hl">$1</mark>'); }catch(e){} } }
   return s;
 }
@@ -1063,6 +1063,7 @@ document.addEventListener('click', e=>{
     const ms=t.closest('.msg'); if(ms){ const id=ms.dataset.mid; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); ms.classList.toggle('is-selected'); const bn=$('#bulkN'); if(bn)bn.textContent=S.sel.size+' выбрано'; if(S.sel.size===0)exitSel(); return; }
   }
   { const jr=t.closest('[data-jumpreply]'); if(jr){ flashMsg(jr.dataset.jumpreply); return; } }
+  { const mj=t.closest('[data-mention-jump]'); if(mj){ e.preventDefault(); const id=mj.dataset.mentionJump; if(U[id]&&id!=='me') startDM(id); return; } }
   { const md=t.closest('[data-photo]'); if(md && !S.selMode){ lightbox(md.dataset.photo); return; } }
   if (t.closest('.msg__voice-play')){ const b=t.closest('.msg__voice-play'); const playing=b.classList.toggle('is-playing'); const u=b.querySelector('use'); if(u)u.setAttribute('href', playing?'#i-pause':'#i-play'); b.closest('.msg__voice')?.querySelector('.msg__wave')?.classList.toggle('is-playing', playing); return; }
   if (t.closest('[data-dl]')){ toast('Скачивание файла…'); return; }
