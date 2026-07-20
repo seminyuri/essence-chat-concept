@@ -350,7 +350,7 @@ function renderConversation(){
      <div class="chat-scroll${S.selMode?' is-selmode':''}" id="scroll">${renderMessages(c)}</div>
      <button class="chat-jump" id="chatJump" title="Вниз" style="display:none">${ic('arrow-down')}</button>
      ${bottom}`;
-  const sc = $('#scroll'); if (sc && S.csearch==null) sc.scrollTop = sc.scrollHeight;
+  const sc = $('#scroll'); if (sc && S.csearch==null){ sc.scrollTop = sc.scrollHeight; requestAnimationFrame(()=>{ if(sc.isConnected) sc.scrollTop = sc.scrollHeight; }); }
   if (sc){ const jump=$('#chatJump'); const upd=()=>{ if(jump) jump.style.display = (sc.scrollHeight - sc.scrollTop - sc.clientHeight > 160) ? '' : 'none'; }; sc.addEventListener('scroll', upd); }
   if (S.csearch!=null){ const ci=$('#csIn'); if(ci){ ci.focus(); ci.setSelectionRange(ci.value.length,ci.value.length); } updateCSCount(); }
 }
@@ -989,6 +989,13 @@ let lpTimer;
 document.addEventListener('touchstart', e=>{ const m=e.target.closest('.msg'); if(m && !S.selMode && !e.target.closest('button,a,.msg__poll-opt')){ lpTimer=setTimeout(()=>{ const r=m.querySelector('.msg__bubble').getBoundingClientRect(); contextMenu(m.dataset.mid, Math.min(r.left+20, innerWidth-230), r.top); }, 450); } }, {passive:true});
 document.addEventListener('touchend', ()=>clearTimeout(lpTimer));
 document.addEventListener('touchmove', ()=>clearTimeout(lpTimer), {passive:true});
+// double-click / double-tap to react ❤️
+document.addEventListener('dblclick', e=>{ const m=e.target.closest('.msg'); if(m && !e.target.closest('a,button,input,textarea,.msg__poll-opt')){ toggleReact(m.dataset.mid, '❤️'); } });
+// swipe-right on a message to reply (mobile)
+let swStart=null, swMsg=null;
+document.addEventListener('touchstart', e=>{ const m=e.target.closest('.msg'); if(m && !S.selMode && !e.target.closest('button,a,input,textarea')){ swStart={x:e.touches[0].clientX, y:e.touches[0].clientY}; swMsg=m; } }, {passive:true});
+document.addEventListener('touchmove', e=>{ if(!swStart||!swMsg) return; const dx=e.touches[0].clientX-swStart.x, dy=e.touches[0].clientY-swStart.y; if(Math.abs(dy)>Math.abs(dx)+6){ swMsg.style.transform=''; swStart=null; return; } if(dx>8){ swMsg.style.transition='none'; swMsg.style.transform='translateX('+Math.min(dx*0.6,60)+'px)'; } }, {passive:true});
+document.addEventListener('touchend', e=>{ if(swStart && swMsg){ const dx=e.changedTouches[0].clientX-swStart.x; swMsg.style.transition='transform .18s var(--ease-spring)'; swMsg.style.transform=''; if(dx>48){ const mm=threadOf(findChat(S.chatId)).find(x=>x.id===swMsg.dataset.mid); if(mm){ if(navigator.vibrate)navigator.vibrate(8); setReply(mm); } } } swStart=null; swMsg=null; });
 // list search
 $('#listSearch').addEventListener('input', e=>{ S.search=e.target.value; renderList(); });
 // composer: enter to send, autosize
