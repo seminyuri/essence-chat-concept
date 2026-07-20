@@ -936,7 +936,13 @@ function attachMenu(x,y){
     <button class="menu__item">${ic('users','icon--sm')} Контакт</button>
     <button class="menu__item">${ic('map','icon--sm')} Геопозиция</button>
   </div>`, x, y-260);
-  OV.addEventListener('click',e=>{ if(e.target.closest('.menu__item')){ closeOverlays(); toast('Прикрепление — в полной версии'); } });
+  OV.addEventListener('click',e=>{ const it=e.target.closest('.menu__item'); if(!it) return; const label=it.textContent.trim(); closeOverlays();
+    const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice();
+    if(/Фото/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),media:{grad:'c'},read:false}); c.last={by:'me',txt:'📷 Фото',t:nowT(),read:false}; }
+    else if(/Документ/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),file:{name:'Бриф.pdf',size:'2,4 МБ'},read:false}); c.last={by:'me',txt:'📎 Бриф.pdf',t:nowT(),read:false}; }
+    else { toast(label+' — в полной версии'); return; }
+    renderConversation(); renderList(); const _sc=$('#scroll'); if(_sc) _sc.lastElementChild?.classList.add('msg-in'); toast('Отправлено');
+  });
 }
 
 /* ─────────────────────────── SETTINGS ─────────────────────────── */
