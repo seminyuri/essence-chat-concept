@@ -595,6 +595,31 @@ html, body { height: 100%; overflow: hidden; }
 .mention-item:hover, .mention-item.is-active { background: var(--color-bg-muted); }
 .mention-item .chat-avatar { width: 30px; height: 30px; font-size: 11px; flex: none; }
 .mention-nm { font-size: 14px; color: var(--color-fg); }
+/* natal chart wheel */
+.nc-body { text-align: center; }
+.nc-meta { font-family: var(--type-mono); font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.nc-wheelwrap { display: flex; justify-content: center; }
+.nc-wheel { width: 100%; max-width: 340px; height: auto; }
+.nc-ring { fill: none; stroke: var(--color-border-strong); stroke-width: 1; }
+.nc-ring--in { stroke: var(--color-border); }
+.nc-div { stroke: var(--color-border); stroke-width: .5; }
+.nc-sign { font-size: 15px; fill: var(--color-accent); text-anchor: middle; dominant-baseline: central; }
+.nc-sign--alt { fill: var(--color-fg-muted); }
+.nc-planet { font-size: 16px; fill: var(--color-fg); text-anchor: middle; dominant-baseline: central; }
+.nc-dot { fill: var(--color-accent); }
+.nc-asp { stroke-width: 1; opacity: .55; }
+.nc-asp--h { stroke: #5b8def; }
+.nc-asp--t { stroke: #d98a6a; }
+.nc-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin: 12px 0 16px; font-size: 11.5px; color: var(--color-fg-muted); }
+.nc-lg { display: inline-flex; align-items: center; gap: 6px; }
+.nc-lg i { width: 16px; height: 2px; border-radius: 2px; display: inline-block; }
+.nc-lg--h i { background: #5b8def; }
+.nc-lg--t i { background: #d98a6a; }
+.nc-keys { text-align: left; display: flex; flex-direction: column; gap: 9px; }
+.nc-key { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; background: var(--color-bg-muted); border-radius: var(--radius-md); }
+.nc-key-g { font-size: 22px; color: var(--color-accent); line-height: 1.1; flex: none; width: 26px; text-align: center; }
+.nc-key-t { font-size: 14px; font-weight: 600; color: var(--color-fg); }
+.nc-key-d { font-size: 12.5px; color: var(--color-fg-muted); margin-top: 2px; }
 /* .menu is position:absolute by default (essence). Inside any popover (.ov-pop —
    context menu, chat «⋯», attach, send-options) it must stack in flow, else it
    drops out, the popover measures 0 height, mis-clamps and clips off-screen. */

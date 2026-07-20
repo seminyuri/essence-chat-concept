@@ -933,6 +933,32 @@ function groupAdminModal(chatId){
   _ovClick=(e=>{ if(e.target.closest('[data-promote]')) toast('Назначен администратором'); });
 }
 
+/* natal chart wheel — the differentiator: specialist opens a client's chart from the chat */
+function natalChartModal(u){
+  const nm=u?.name||'Клиент'; const bd=u?.natal||{date:'—',time:'—',place:'—'};
+  const CX=170, CY=170, RO=158, RZ=137, RH=112, RP=125, RI=96;
+  const P=(r,d)=>{ const a=(d-90)*Math.PI/180; return [+(CX+r*Math.cos(a)).toFixed(1), +(CY+r*Math.sin(a)).toFixed(1)]; };
+  const SIGNS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+  let ring='';
+  for(let i=0;i<12;i++){ const [x1,y1]=P(RI,i*30),[x2,y2]=P(RO,i*30); ring+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="nc-div"/>`;
+    const [gx,gy]=P(RZ,i*30+15); ring+=`<text x="${gx}" y="${gy}" class="nc-sign${i%2?' nc-sign--alt':''}">${SIGNS[i]}</text>`; }
+  const PLANETS=[['☉',0,354],['☽',0,42],['☿',0,338],['♀',0,3],['♂',0,290],['♃',0,160],['♄',0,312],['⬆',1,75]];
+  let dots='',pts='';
+  PLANETS.forEach(([g,,deg])=>{ const [dx,dy]=P(RH,deg),[px,py]=P(RP,deg); dots+=`<circle cx="${dx}" cy="${dy}" r="2.2" class="nc-dot"/>`; pts+=`<text x="${px}" y="${py}" class="nc-planet">${g}</text>`; });
+  const ASP=[[354,42,'h'],[3,290,'t'],[338,160,'t'],[312,75,'h'],[290,160,'h']];
+  let asp=''; ASP.forEach(([a,b,k])=>{ const [x1,y1]=P(RH,a),[x2,y2]=P(RH,b); asp+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="nc-asp nc-asp--${k}"/>`; });
+  const svg=`<svg viewBox="0 0 340 340" class="nc-wheel"><circle cx="${CX}" cy="${CY}" r="${RO}" class="nc-ring"/><circle cx="${CX}" cy="${CY}" r="${RH}" class="nc-ring"/><circle cx="${CX}" cy="${CY}" r="${RI}" class="nc-ring nc-ring--in"/>${ring}${asp}${dots}${pts}</svg>`;
+  const KEY=[['☉','Солнце в Рыбах','эмпатия, интуиция, тонкое чувствование среды'],['☽','Луна в Тельце','потребность в стабильности и телесном комфорте'],['⬆','Асцендент в Близнецах','лёгкость контакта, любопытство, живой ум']];
+  modal(`<div class="modal__header"><div class="modal__title">Натальная карта · ${esc(nm)}</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body nc-body">
+      <div class="nc-meta">${ic('sparkles','icon--sm')} ${esc(bd.date)} · ${esc(bd.time||'—')} · ${esc(bd.place||'—')}</div>
+      <div class="nc-wheelwrap">${svg}</div>
+      <div class="nc-legend"><span class="nc-lg nc-lg--h"><i></i>гармоничные аспекты</span><span class="nc-lg nc-lg--t"><i></i>напряжённые</span></div>
+      <div class="nc-keys">${KEY.map(([g,t,d])=>`<div class="nc-key"><span class="nc-key-g">${g}</span><div><div class="nc-key-t">${t}</div><div class="nc-key-d">${d}</div></div></div>`).join('')}</div>
+    </div>
+    <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Закрыть</button><button class="btn btn--primary btn--md" data-hint="Полный разбор откроется в кабинете Сути">Полный разбор ${ic('chev-r','icon--sm')}</button></div>`,'md');
+}
+
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
 function openChat(id){
   S.chatId = id; S.reply=null; S.editId=null;
@@ -1076,7 +1102,7 @@ document.addEventListener('click', e=>{
   if (t.closest('[data-groupadmin]')){ groupAdminModal(S.chatId); return; }
   // ribbon actions
   if (t.closest('[data-invite]')){ inviteModal(); return; }
-  if (t.closest('[data-natal]')){ toggleInfo(true); return; }
+  if (t.closest('[data-natal]')){ const c=findChat(S.chatId); natalChartModal(c?userOf(c):null); return; }
   // composer
   if (t.closest('#chatJump')){ const sc=$('#scroll'); if(sc) sc.scrollTo({top:sc.scrollHeight, behavior:'smooth'}); return; }
   if (t.closest('#cmpSend')){ send(); return; }
