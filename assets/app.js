@@ -599,7 +599,7 @@ function contextMenu(mid, x, y){
   OV.addEventListener('click', e=>{
     const ee=e.target.closest('[data-ctxe]'); if(ee){ toggleReact(mid, ee.dataset.ctxe); closeOverlays(); return; }
     if(e.target.closest('[data-ctxmore]')){ emojiPicker({react:mid}, x, y); return; }
-    const b=e.target.closest('[data-cm]'); if(b){ onContext(b.dataset.cm, mid); closeOverlays(); }
+    const b=e.target.closest('[data-cm]'); if(b){ closeOverlays(); onContext(b.dataset.cm, mid); }
   });
 }
 function onContext(cmd, mid){
@@ -633,11 +633,20 @@ function emojiPicker(target, x, y){
   });
 }
 function forwardPicker(mid){
+  const src = mid ? threadOf(findChat(S.chatId)).find(x=>x.id===mid) : null;
+  const author = src ? (src.from==='me'?U.me.name:(U[src.from]||{name:src.from}).name) : '';
   const list = chatsFor(S.org);
+  const rowHtml = cs => cs.map(c=>`<button class="chat-row" style="width:100%" data-fwd="${c.id}">${chatAvatar(c)}<div class="chat-row__body"><div class="chat-row__name">${esc(c.title)}</div></div></button>`).join('');
   modal(`<div class="modal__header"><div class="modal__title">Переслать</div><button class="modal__close" data-close>✕</button></div>
-    <div class="modal__body" style="max-height:50vh"><div class="chat-search" style="margin-bottom:8px"><input placeholder="Кому переслать…" style="border:0;background:none;outline:none;width:100%;font:inherit"></div>
-    ${list.map(c=>`<button class="chat-row" style="width:100%" data-fwd="${c.id}">${chatAvatar(c)}<div class="chat-row__body"><div class="chat-row__name">${esc(c.title)}</div></div></button>`).join('')}</div>`,'md');
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-fwd]'); if(!b)return; closeOverlays(); openChat(b.dataset.fwd); toast('Переслано'); });
+    <div class="modal__body" style="max-height:50vh"><div class="chat-search" style="margin-bottom:8px"><input id="fwdSearch" placeholder="Кому переслать…" style="border:0;background:none;outline:none;width:100%;font:inherit"></div>
+    <div id="fwdList">${rowHtml(list)}</div></div>`,'md');
+  const fs=$('#fwdSearch');
+  if(fs) fs.addEventListener('input',()=>{ const q=fs.value.trim().toLowerCase(); const f=list.filter(c=>c.title.toLowerCase().includes(q)); $('#fwdList').innerHTML = f.length?rowHtml(f):`<div class="empty-state" style="padding:20px"><div class="empty-state__description">Не найдено</div></div>`; });
+  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-fwd]'); if(!b)return; const tid=b.dataset.fwd; closeOverlays();
+    if(src){ const tc=findChat(tid); const th=MSGS[tc.id]=threadOf(tc).slice();
+      th.push({ id:'m'+uid(), from:'me', t:nowT(), fwd:author, text:src.text, media:src.media, cap:src.cap, file:src.file, voice:src.voice, link:src.link, read:false });
+      tc.last={ by:'me', txt:src.text||(src.media!=null?'Фото':src.file?src.file.name:src.voice?'Голосовое':'Вложение'), t:nowT(), read:false }; }
+    openChat(tid); toast('Переслано'); });
 }
 function modal(inner, size='md'){
   closeOverlays();
