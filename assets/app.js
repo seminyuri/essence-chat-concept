@@ -553,10 +553,14 @@ function renderInfo(){
 }
 
 /* ─────────────────────────── OVERLAYS ─────────────────────────── */
-let OV = $('#overlays');
-// Replace #overlays with a fresh clone so ALL per-overlay click/change listeners
-// are dropped (innerHTML='' alone leaks them → stale closures double-fire on reopen).
-function closeOverlays(){ if(OV.firstChild){ const f=OV.cloneNode(false); OV.replaceWith(f); OV=f; } }
+const OV = $('#overlays');
+// One persistent delegated handler per event type; overlays ASSIGN _ovClick/_ovChange.
+// Assignment replaces the previous handler (no listener leak → no double-fire on reopen)
+// AND survives modal()/popover() re-renders, so in-place multi-step overlays keep working.
+let _ovClick=null, _ovChange=null;
+OV.addEventListener('click',  e=>{ if(_ovClick)  _ovClick(e);  });
+OV.addEventListener('change', e=>{ if(_ovChange) _ovChange(e); });
+function closeOverlays(){ OV.innerHTML=''; _ovClick=_ovChange=null; }
 function lightbox(photo){
   const w = document.createElement('div'); w.className='lightbox';
   w.innerHTML = `<button class="lightbox__close" data-lbclose>${ic('x')}</button><div class="lightbox__img" style="width:min(880px,92vw);aspect-ratio:4/3;background:${photoBg(photo)}"></div>`;
@@ -579,7 +583,7 @@ function popover(html, x, y, cls=''){
 const EMOJI = ['❤️','👍','🔥','😂','😮','😢','🙏','🎉','👏','✅','🤝','💯','😍','🤔','🥳','💛','☀️','✨'];
 function reactBar(mid, x, y){
   popover(`<div class="ctx-react">${EMOJI.slice(0,7).map(e=>`<button class="ctx-react__e" data-e="${e}">${e}</button>`).join('')}<button class="ctx-react__e ctx-react__more" data-more>${ic('plus','icon--sm')}</button></div>`, x-150, y-52);
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-e]'); if(b){ toggleReact(mid,b.dataset.e); closeOverlays(); return; } if(e.target.closest('[data-more]')){ emojiPicker({react:mid},x,y); } });
+  _ovClick=( e=>{ const b=e.target.closest('[data-e]'); if(b){ toggleReact(mid,b.dataset.e); closeOverlays(); return; } if(e.target.closest('[data-more]')){ emojiPicker({react:mid},x,y); } });
 }
 function contextMenu(mid, x, y){
   const c = findChat(S.chatId); const m = threadOf(c).find(x=>x.id===mid);
@@ -596,7 +600,7 @@ function contextMenu(mid, x, y){
   const emojiRow = `<div class="ctx-react">${EMOJI.slice(0,7).map(e=>`<button class="ctx-react__e" data-ctxe="${e}">${e}</button>`).join('')}<button class="ctx-react__e ctx-react__more" data-ctxmore>${ic('plus','icon--sm')}</button></div>`;
   const menu = `<div class="menu" style="min-width:206px">${items.map(it=>`<button class="menu__item${it[3]?' menu__item--danger':''}" data-cm="${it[0]}">${ic(it[2],'icon--sm')} ${it[1]}</button>`).join('')}</div>`;
   popover(`<div class="ctx-wrap">${emojiRow}${menu}</div>`, x, y);
-  OV.addEventListener('click', e=>{
+  _ovClick=( e=>{
     const ee=e.target.closest('[data-ctxe]'); if(ee){ toggleReact(mid, ee.dataset.ctxe); closeOverlays(); return; }
     if(e.target.closest('[data-ctxmore]')){ emojiPicker({react:mid}, x, y); return; }
     const b=e.target.closest('[data-cm]'); if(b){ closeOverlays(); onContext(b.dataset.cm, mid); }
@@ -642,14 +646,16 @@ function forwardPicker(mid){
     <div id="fwdList">${rowHtml(list)}</div></div>`,'md');
   const fs=$('#fwdSearch');
   if(fs) fs.addEventListener('input',()=>{ const q=fs.value.trim().toLowerCase(); const f=list.filter(c=>c.title.toLowerCase().includes(q)); $('#fwdList').innerHTML = f.length?rowHtml(f):`<div class="empty-state" style="padding:20px"><div class="empty-state__description">Не найдено</div></div>`; });
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-fwd]'); if(!b)return; const tid=b.dataset.fwd; closeOverlays();
+  _ovClick=( e=>{ const b=e.target.closest('[data-fwd]'); if(!b)return; const tid=b.dataset.fwd; closeOverlays();
     if(src){ const tc=findChat(tid); const th=MSGS[tc.id]=threadOf(tc).slice();
       th.push({ id:'m'+uid(), from:'me', t:nowT(), fwd:author, text:src.text, media:src.media, cap:src.cap, file:src.file, voice:src.voice, link:src.link, read:false });
       tc.last={ by:'me', txt:src.text||(src.media!=null?'Фото':src.file?src.file.name:src.voice?'Голосовое':'Вложение'), t:nowT(), read:false }; }
     openChat(tid); toast('Переслано'); });
 }
 function modal(inner, size='md'){
-  closeOverlays();
+  // NB: don't closeOverlays() here — it would null the current overlay's handler and break
+  // in-place re-renders (multi-step modals call modal() again). Fresh opens are reset by their
+  // entry-point closeOverlays() + the overlay re-assigning _ovClick right after this call.
   OV.innerHTML = `<div class="modal-back" style="position:fixed;inset:0;z-index:1040;background:rgba(20,15,10,.44);backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px">
     <div class="modal__panel modal--${size}" style="max-width:${size==='sm'?420:size==='lg'?760:560}px;width:100%">${inner}</div></div>`;
   OV.querySelector('.modal-back').addEventListener('click', e=>{ if(e.target.classList.contains('modal-back')||e.target.closest('[data-close]')) closeOverlays(); });
@@ -709,7 +715,7 @@ function newChatMenu(x=innerWidth/2,y=180){
       <div class="menu__sep"></div>
       <button class="menu__item" data-nc="invite">${ic('user-plus','icon--sm')} Пригласить клиента / внешнего по ссылке</button>
     </div>`,'sm');
-  OV.addEventListener('click',e=>{ const b=e.target.closest('[data-nc]'); if(!b)return; const k=b.dataset.nc; closeOverlays();
+  _ovClick=(e=>{ const b=e.target.closest('[data-nc]'); if(!b)return; const k=b.dataset.nc; closeOverlays();
     if(k==='invite')inviteModal(); else if(k==='dm')contactPicker(); else if(k==='group')newGroupModal(); else if(k==='channel')newChannelModal(); });
 }
 
@@ -735,8 +741,8 @@ function inviteModal(){
     </div>
     <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><a class="btn btn--primary btn--md" href="?view=join&req=${requireNatal?1:0}">Открыть как клиент →</a></div>`,'md');
   render();
-  OV.addEventListener('change',e=>{ if(e.target.id==='reqNatal'){requireNatal=e.target.checked; render();} });
-  OV.addEventListener('click',e=>{ if(e.target.closest('[data-copylink]')){navigator.clipboard?.writeText('https://chat.the-essence.ai/join/'+(requireNatal?'c':'x')+'-8f2a91'); toast('Ссылка скопирована');} });
+  _ovChange=(e=>{ if(e.target.id==='reqNatal'){requireNatal=e.target.checked; render();} });
+  _ovClick=(e=>{ if(e.target.closest('[data-copylink]')){navigator.clipboard?.writeText('https://chat.the-essence.ai/join/'+(requireNatal?'c':'x')+'-8f2a91'); toast('Ссылка скопирована');} });
 }
 
 /* new DM — contact picker */
@@ -747,7 +753,7 @@ function contactPicker(){
       <label class="chat-search" style="margin-bottom:10px">${ic('search','icon--sm')}<input id="cpq" placeholder="Кому написать…" style="border:0;background:none;outline:none;font:inherit;flex:1"></label>
       <div id="cplist">${users.map(id=>`<button class="info__member" style="width:100%" data-dm="${id}">${AVATAR(U[id])}<div class="info__member-b"><div class="info__member-nm">${esc(U[id].name)}</div><div class="info__member-pr${U[id].pr==='online'?' info__member-pr--online':''}">${presenceLabel(U[id])}</div></div></button>`).join('')}</div>
     </div>`,'sm');
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-dm]'); if(b){ closeOverlays(); startDM(b.dataset.dm); } });
+  _ovClick=( e=>{ const b=e.target.closest('[data-dm]'); if(b){ closeOverlays(); startDM(b.dataset.dm); } });
   const q=$('#cpq'); if(q) q.addEventListener('input',()=>{ const v=q.value.toLowerCase(); $$('#cplist [data-dm]').forEach(el=>{ el.style.display=U[el.dataset.dm].name.toLowerCase().includes(v)?'':'none'; }); });
 }
 function startDM(uid){
@@ -779,7 +785,7 @@ function newGroupModal(){
     }
   };
   render();
-  OV.addEventListener('click', e=>{
+  _ovClick=( e=>{
     const p=e.target.closest('[data-pick]'); if(p){ const id=p.dataset.pick; chosen.has(id)?chosen.delete(id):chosen.add(id); updChips(); return; }
     if(e.target.closest('[data-next]')){ step=2; render(); return; }
     if(e.target.closest('[data-back]')){ step=1; render(); updChips(); return; }
@@ -797,7 +803,7 @@ function newChannelModal(){
       <label class="field" style="margin-bottom:14px"><span class="field__label">Описание</span><textarea class="input" style="height:auto;min-height:60px;padding:10px 12px" placeholder="О чём канал"></textarea></label>
       <div class="set__card"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Публичный</div><div class="set__item-d">Виден по ссылке всем в организации</div></div><label class="toggle"><input type="checkbox" class="toggle__input" checked><span class="toggle__track"><span class="toggle__thumb"></span></span></label></div></div></div>
     <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-createch>Создать</button></div>`,'sm');
-  OV.addEventListener('click', e=>{ if(e.target.closest('[data-createch]')){ const name=$('#chname')?.value.trim()||'Новый канал'; const c={id:'ch_'+uid(),type:'channel',title:name,av:'e',s:'📣',icon:'hash',folder:'all',last:{by:'sys',txt:'Канал создан',t:nowT()},unread:0,subscribers:1}; CHATS[realOrg()].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'Канал «'+esc(name)+'» создан'}]; closeOverlays(); openChat(c.id); toast('Канал создан'); } });
+  _ovClick=( e=>{ if(e.target.closest('[data-createch]')){ const name=$('#chname')?.value.trim()||'Новый канал'; const c={id:'ch_'+uid(),type:'channel',title:name,av:'e',s:'📣',icon:'hash',folder:'all',last:{by:'sys',txt:'Канал создан',t:nowT()},unread:0,subscribers:1}; CHATS[realOrg()].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'Канал «'+esc(name)+'» создан'}]; closeOverlays(); openChat(c.id); toast('Канал создан'); } });
 }
 
 /* avatar crop */
@@ -824,7 +830,7 @@ function pollCreateModal(){
     <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-pollcreate>Создать</button></div>`,'sm');
   const sync=()=>{ const pq=$('#pq'); if(pq)q=pq.value; $$('#popts [data-oi]').forEach(i=>opts[+i.dataset.oi]=i.value); };
   render();
-  OV.addEventListener('click', e=>{
+  _ovClick=( e=>{
     if(e.target.closest('[data-addopt]')){ sync(); if(opts.length<6)opts.push(''); render(); return; }
     if(e.target.closest('[data-pollcreate]')){ sync(); const question=q.trim()||'Опрос'; const clean=opts.map(o=>o.trim()).filter(Boolean); if(clean.length<2){ toast('Нужно минимум 2 варианта'); return; } const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(),from:'me',t:nowT(),poll:{q:question,options:clean.map(t=>({t,v:0})),total:0,voted:null},read:false}); c.last={by:'me',txt:'📊 '+question,t:nowT(),read:false}; closeOverlays(); renderConversation(); renderList(); toast('Опрос создан'); return; }
   });
@@ -905,7 +911,7 @@ function groupAdminModal(chatId){
       <div class="set__grouph">Роли</div>
       <div class="set__card">${(c.members||[]).map(id=>{const mu=U[id]||{name:id,av:'c',s:'?'};const role=id==='me'?'owner':(id==='anya'||id==='dmitry')?'admin':'member';return `<div class="info__member" style="padding:10px 14px">${AVATAR(mu)}<div class="info__member-b"><div class="info__member-nm">${esc(mu.name)}${id==='me'?' (вы)':''}</div><div class="info__member-pr">${role==='owner'?'Все права':role==='admin'?'Администратор':'Участник'}</div></div>${role==='owner'?'<span class="info__role info__role--owner">владелец</span>':role==='admin'?'<span class="info__role info__role--admin">админ</span>':'<button class="btn btn--ghost btn--sm" data-promote>Сделать админом</button>'}</div>`;}).join('')}</div>
     </div>`,'md');
-  OV.addEventListener('click',e=>{ if(e.target.closest('[data-promote]')) toast('Назначен администратором'); });
+  _ovClick=(e=>{ if(e.target.closest('[data-promote]')) toast('Назначен администратором'); });
 }
 
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
@@ -1056,7 +1062,7 @@ function chatRowMenu(id, x, y){
     {ic:'check',   label:isRead?'Пометить непрочитанным':'Пометить прочитанным', run(){ if(isRead){ S.read[id]=false; if(!(c.unread>0))c.unread=1; } else { S.read[id]=true; } return isRead?'Отмечено непрочитанным':'Отмечено прочитанным'; }},
   ];
   popover(`<div class="menu" style="min-width:232px">${acts.map((a,i)=>`<button class="menu__item" data-rowact="${i}">${ic(a.ic,'icon--sm')} ${a.label}</button>`).join('')}<div class="menu__sep"></div><button class="menu__item menu__item--danger" data-rowact="del">${ic('trash','icon--sm')} Удалить чат</button></div>`, x, y);
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-rowact]'); if(!b) return; const v=b.dataset.rowact;
+  _ovClick=( e=>{ const b=e.target.closest('[data-rowact]'); if(!b) return; const v=b.dataset.rowact;
     if(v==='del'){ closeOverlays(); toast('Чат удалён — в полной версии'); return; }
     const msg=acts[+v].run(); const wasOpen=S.chatId===id; closeOverlays(); renderList(); if(wasOpen&&!c.archived) renderConversation(); toast(msg);
   });
@@ -1134,7 +1140,7 @@ function attachMenu(x,y){
     <button class="menu__item">${ic('users','icon--sm')} Контакт</button>
     <button class="menu__item">${ic('map','icon--sm')} Геопозиция</button>
   </div>`, x, y-260);
-  OV.addEventListener('click',e=>{ const it=e.target.closest('.menu__item'); if(!it) return; const label=it.textContent.trim(); closeOverlays();
+  _ovClick=(e=>{ const it=e.target.closest('.menu__item'); if(!it) return; const label=it.textContent.trim(); closeOverlays();
     if(/Фото/.test(label)){ photoPreview(); return; }
     if(/Опрос/.test(label)){ pollCreateModal(); return; }
     const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice();
@@ -1151,7 +1157,7 @@ function photoPreview(){
       <input class="input" id="phcap" placeholder="Добавить подпись…"></div>
     <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-phsend data-idx="${idx}">${ic('send','icon--sm')} Отправить</button></div>`,'md');
   const inp=$('#phcap'); if(inp) inp.focus();
-  OV.addEventListener('click',e=>{ const b=e.target.closest('[data-phsend]'); if(!b) return; const cap=($('#phcap')?.value||'').trim(); const c=findChat(S.chatId); if(!c){closeOverlays();return;}
+  _ovClick=(e=>{ const b=e.target.closest('[data-phsend]'); if(!b) return; const cap=($('#phcap')?.value||'').trim(); const c=findChat(S.chatId); if(!c){closeOverlays();return;}
     const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(),from:'me',t:nowT(),media:{photo:+b.dataset.idx},cap,read:false}); c.last={by:'me',txt:'📷 Фото'+(cap?' · '+cap:''),t:nowT(),read:false};
     closeOverlays(); renderConversation(); renderList(); const _sc=$('#scroll'); if(_sc)_sc.lastElementChild?.classList.add('msg-in');
   });
