@@ -538,7 +538,7 @@ function renderInfo(){
         <span class="info__natal-k">Время</span><span class="info__natal-v${n&&n.time?'':' info__natal-v--empty'}">${n&&n.time?esc(n.time):'не указано'}</span>
         <span class="info__natal-k">Место</span><span class="info__natal-v${n&&n.place?'':' info__natal-v--empty'}">${n&&n.place?esc(n.place):'не указано'}</span>
       </div>
-      ${!n?`<button class="btn btn--secondary btn--sm" style="margin-top:10px;width:100%" data-invite="${c.id}">Запросить онбординг</button>`:''}
+      ${!n?`<button class="btn btn--secondary btn--sm" style="margin-top:10px;width:100%" data-invite="${c.id}">Запросить онбординг</button>`:`<button class="btn btn--secondary btn--sm" style="margin-top:10px;width:100%" data-natal>${ic('sparkles','icon--sm')} Открыть карту</button>`}
     </div>`;
   }
   // members for group
