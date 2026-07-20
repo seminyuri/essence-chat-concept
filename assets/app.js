@@ -617,6 +617,9 @@ document.addEventListener('click', e=>{
   const row=t.closest('[data-chat]'); if(row && row.closest('#chatList')){ openChat(row.dataset.chat); return; }
   // theme
   if (t.closest('#themeToggle')){ toggleTheme(); return; }
+  // settings entry
+  if (t.closest('#meAvatar')){ renderSettings('profile'); return; }
+  { const railI=t.closest('.shell-apprail__item'); if (railI && railI.title==='Настройки'){ renderSettings('appearance'); return; } }
   // global search / cmdk
   if (t.closest('#globalSearch')){ cmdk(); return; }
   // new chat
@@ -682,6 +685,108 @@ function attachMenu(x,y){
   OV.addEventListener('click',e=>{ if(e.target.closest('.menu__item')){ closeOverlays(); toast('Прикрепление — в полной версии'); } });
 }
 
+/* ─────────────────────────── SETTINGS ─────────────────────────── */
+const PERSONAS = [['','#7A5340','Суть'],['pair','#C77A8A','Пара'],['growth','#5C7E5A','Рост'],['quiet','#6B6E8E','Тишина'],['tide','#4A7B92','Прилив'],['ember','#B8623E','Уголь']];
+function curTheme(){ const ls=localStorage.getItem('the-essence:theme'); return ls==='dark'?'dark':ls==='light'?'light':'system'; }
+function seg(name, opts, cur){ return `<div class="segmented" data-seg="${name}">${opts.map(o=>`<label class="segmented__option${o[0]===cur?' segmented__option--active':''}" data-seg-val="${o[0]}">${o[1]}</label>`).join('')}</div>`; }
+function toggleRow(t,d,on){ return `<div class="set__item"><div class="set__item-b"><div class="set__item-t">${t}</div>${d?`<div class="set__item-d">${d}</div>`:''}</div><label class="toggle"><input type="checkbox" class="toggle__input" ${on?'checked':''}><span class="toggle__track"><span class="toggle__thumb"></span></span></label></div>`; }
+function selectRow(t,d,opts){ return `<div class="set__item"><div class="set__item-b"><div class="set__item-t">${t}</div>${d?`<div class="set__item-d">${d}</div>`:''}</div><select class="select" style="width:150px;flex:none">${opts.map(o=>`<option>${o}</option>`).join('')}</select></div>`; }
+
+function settingsSection(sec){
+  if (sec==='profile'){
+    return `<div class="set__h">Профиль</div><div class="set__sub">Как тебя видят другие участники.</div>
+      <div class="set__profile"><div class="set__avwrap">${AVATAR({...U.me,pr:null})}<button class="set__avedit" data-avedit title="Сменить фото">${ic('camera','icon--sm')}</button></div>
+        <div><div class="set__item-t" style="font-size:19px;font-family:var(--font-display)">Юрий Сёмин</div><div class="set__item-d" style="font-size:13px">@yuri · Основатель · во всех организациях</div>
+        <button class="btn btn--secondary btn--sm" style="margin-top:10px" data-avedit>Сменить фото</button></div></div>
+      <div class="set__card">
+        <div class="set__item"><div class="set__item-b"><div class="set__item-d">Имя</div><div class="set__item-t">Юрий Сёмин</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item"><div class="set__item-b"><div class="set__item-d">Имя пользователя</div><div class="set__item-t">@yuri</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item"><div class="set__item-b"><div class="set__item-d">О себе</div><div class="set__item-t">Строю экосистему «Суть» ✨</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item"><div class="set__item-b"><div class="set__item-d">Телефон</div><div class="set__item-t">+7 905 •••‑00‑01</div></div>${ic('lock','icon--sm')}</div>
+      </div>`;
+  }
+  if (sec==='appearance'){
+    const p = document.documentElement.getAttribute('data-persona')||'';
+    const d = document.documentElement.getAttribute('data-density')||'comfortable';
+    return `<div class="set__h">Оформление</div><div class="set__sub">Тема, акцент и плотность — применяются сразу.</div>
+      <div class="set__group"><div class="set__grouph">Тема</div><div class="set__card"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Оформление</div><div class="set__item-d">Тёмная тема тёплая, не серая.</div></div>${seg('theme',[['light','Светлая'],['dark','Тёмная'],['system','Системная']],curTheme())}</div></div></div>
+      <div class="set__group"><div class="set__grouph">Акцент</div><div class="set__card"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Цвет акцента</div><div class="set__item-d">Персональная палитра поверх бренда.</div></div>
+        <div class="set__swatches">${PERSONAS.map(pp=>`<button class="set__swatch${pp[0]===p?' is-active':''}" data-persona-set="${pp[0]}" style="background:${pp[1]}" title="${pp[2]}"></button>`).join('')}</div></div></div></div>
+      <div class="set__group"><div class="set__grouph">Плотность и текст</div><div class="set__card">
+        <div class="set__item"><div class="set__item-b"><div class="set__item-t">Плотность</div><div class="set__item-d">Высота строк и отступы.</div></div>${seg('density',[['compact','Компактно'],['comfortable','Обычно'],['spacious','Просторно']],d)}</div>
+        <div class="set__item"><div class="set__item-b"><div class="set__item-t">Размер текста</div></div>${seg('textsize',[['s','А'],['m','А'],['l','А']],'m')}</div>
+      </div></div>`;
+  }
+  if (sec==='notifications'){
+    return `<div class="set__h">Уведомления</div><div class="set__sub">Что и как тебе приходит.</div>
+      <div class="set__group"><div class="set__grouph">Каналы</div><div class="set__card">
+        ${toggleRow('Личные сообщения','',true)}${toggleRow('Группы','Только упоминания и ответы',true)}${toggleRow('Каналы','',false)}${toggleRow('Реакции на мои сообщения','',true)}
+      </div></div>
+      <div class="set__group"><div class="set__grouph">Как</div><div class="set__card">
+        ${toggleRow('Звук','',true)}${toggleRow('Превью текста','Показывать текст в уведомлении',true)}${toggleRow('Вибрация','',true)}
+      </div></div>
+      <div class="set__group"><div class="set__grouph">Не беспокоить</div><div class="set__card">
+        ${toggleRow('Тихие часы','С 22:00 до 8:00 — без звука',true)}
+      </div></div>`;
+  }
+  if (sec==='privacy'){
+    return `<div class="set__h">Приватность</div><div class="set__sub">Кто и что о тебе видит.</div>
+      <div class="set__group"><div class="set__grouph">Кто видит</div><div class="set__card">
+        ${selectRow('Номер телефона','',['Мои контакты','Все','Никто'])}
+        ${selectRow('Фото профиля','',['Все','Мои контакты','Никто'])}
+        ${selectRow('«Был(а) в сети»','',['Мои контакты','Все','Никто'])}
+      </div></div>
+      <div class="set__group"><div class="set__grouph">Кто может</div><div class="set__card">
+        ${selectRow('Добавлять меня в группы','',['Мои контакты','Все','Никто'])}
+        ${selectRow('Звонить мне','',['Все','Мои контакты','Никто'])}
+      </div></div>
+      <div class="set__group"><div class="set__grouph">Сообщения</div><div class="set__card">
+        ${toggleRow('Отправлять «Прочитано»','Если выключить — ты тоже не видишь чужие',true)}
+        <div class="set__item"><div class="set__item-b"><div class="set__item-t">Заблокированные</div><div class="set__item-d">Никого</div></div>${ic('chev-r','icon--sm')}</div>
+      </div></div>`;
+  }
+  if (sec==='devices'){
+    return `<div class="set__h">Устройства</div><div class="set__sub">Активные сеансы.</div>
+      <div class="set__card">
+        <div class="set__item"><span class="info__act-ic" style="background:var(--color-success-soft);color:var(--color-success-text)">${ic('globe','icon--sm')}</span><div class="set__item-b"><div class="set__item-t">Chrome · macOS · этот компьютер</div><div class="set__item-d">Самара · сейчас онлайн</div></div></div>
+        <div class="set__item"><span class="info__act-ic">${ic('message','icon--sm')}</span><div class="set__item-b"><div class="set__item-t">iPhone · Суть Чат</div><div class="set__item-d">был онлайн 2 ч назад</div></div><button class="btn btn--ghost btn--sm">Выйти</button></div>
+      </div>
+      <button class="btn btn--outline btn--md" style="margin-top:16px;color:var(--color-danger-text);border-color:var(--color-danger-soft)">Завершить все другие сеансы</button>`;
+  }
+  if (sec==='orgs'){
+    return `<div class="set__h">Организации</div><div class="set__sub">Рабочие пространства, где ты состоишь.</div>
+      <div class="set__card">
+        ${Object.entries(ORGS).map(([id,o])=>`<div class="set__item"><span class="chat-ws__logo" style="width:38px;height:38px">${esc(o.logo)}</span><div class="set__item-b"><div class="set__item-t">${esc(o.name)}</div><div class="set__item-d">${id==='sut'?'Владелец':id==='personal'?'Личное пространство':'Администратор'}</div></div>${id!=='personal'?`<button class="btn btn--ghost btn--sm">Выйти</button>`:''}</div>`).join('')}
+      </div>
+      <button class="btn btn--secondary btn--md" style="margin-top:16px">${ic('plus','icon--sm')} Создать организацию</button>`;
+  }
+  return '';
+}
+function renderSettings(sec){
+  sec = sec || 'appearance';
+  const app=$('.chat-app'); if(app) app.style.display='none';
+  let wrap=$('.set'); if(!wrap){ wrap=document.createElement('div'); wrap.className='set'; document.body.appendChild(wrap); }
+  const NAV=[['profile','Профиль','users'],['appearance','Оформление','sun'],['notifications','Уведомления','bell'],['privacy','Приватность','lock'],['devices','Устройства','globe'],['orgs','Организации','shield']];
+  wrap.innerHTML = `<div class="set__top"><button class="shell-icon-btn" data-set-close>${ic('back')}</button><div class="set__title">Настройки</div>
+      <button class="shell-icon-btn" id="setTheme" title="Тема"><svg class="icon shell-icon-btn__sun"><use href="#i-sun"/></svg><svg class="icon shell-icon-btn__moon"><use href="#i-moon"/></svg></button></div>
+    <div class="set__wrap"><div class="set__inner">
+      <nav class="set__nav">${NAV.map(n=>`<button class="set__navitem${n[0]===sec?' is-active':''}" data-set-nav="${n[0]}">${ic(n[2],'icon--sm')}<span>${n[1]}</span></button>`).join('')}</nav>
+      <div class="set__content" id="setContent">${settingsSection(sec)}</div>
+    </div></div>`;
+  wrap.onclick = e=>{
+    if (e.target.closest('[data-set-close]')){ wrap.remove(); if(app) app.style.display=''; history.replaceState(null,'','?'); return; }
+    if (e.target.closest('#setTheme')){ toggleTheme(); return; }
+    const nav=e.target.closest('[data-set-nav]'); if(nav){ $$('.set__navitem',wrap).forEach(x=>x.classList.remove('is-active')); nav.classList.add('is-active'); $('#setContent',wrap).innerHTML=settingsSection(nav.dataset.setNav); return; }
+    const sv=e.target.closest('[data-seg-val]'); if(sv){ const seg=sv.closest('[data-seg]').dataset.seg; applySetting(seg, sv.dataset.segVal); $$('.segmented__option',sv.parentElement).forEach(x=>x.classList.remove('segmented__option--active')); sv.classList.add('segmented__option--active'); return; }
+    const ps=e.target.closest('[data-persona-set]'); if(ps){ const v=ps.dataset.personaSet; if(v)document.documentElement.setAttribute('data-persona',v); else document.documentElement.removeAttribute('data-persona'); $$('.set__swatch',wrap).forEach(x=>x.classList.remove('is-active')); ps.classList.add('is-active'); return; }
+    if (e.target.closest('[data-avedit]')){ toast('Загрузка и кадрирование фото — в полной версии'); return; }
+  };
+}
+function applySetting(kind,val){
+  if (kind==='theme'){ const d=document.documentElement; if(val==='dark'){d.setAttribute('data-theme','dark');localStorage.setItem('the-essence:theme','dark');} else if(val==='light'){d.removeAttribute('data-theme');localStorage.setItem('the-essence:theme','light');} else {localStorage.removeItem('the-essence:theme'); if(matchMedia('(prefers-color-scheme: dark)').matches)d.setAttribute('data-theme','dark');else d.removeAttribute('data-theme');} }
+  else if (kind==='density'){ document.documentElement.setAttribute('data-density', val); }
+}
+
 /* ─────────────────────────── JOIN LANDING (invite by link) ─────────────────────────── */
 function renderJoin(req){
   const app = $('.chat-app'); if (app) app.style.display = 'none';
@@ -742,6 +847,7 @@ function renderJoin(req){
 /* ─────────────────────────── BOOT ─────────────────────────── */
 function boot(){
   if (P.get('view')==='join'){ renderJoin(P.get('req')!=='0'); return; }
+  if (P.get('view')==='settings'){ renderAll(); renderSettings(P.get('sec')); return; }
   renderAll();
   if (S.chatId && findChat(S.chatId)) openChat(S.chatId);
   else if (innerWidth>900){ /* auto-open first chat on desktop for a full first impression */ openChat(chatsFor(S.org)[0].id); }
