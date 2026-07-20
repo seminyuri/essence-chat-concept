@@ -281,7 +281,11 @@ html, body { height: 100%; overflow: hidden; }
 .msg__voice-play { width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center;
                    background: var(--color-accent); color: var(--color-accent-on); cursor: pointer; }
 .msg__wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 28px; }
-.msg__wave span { flex: 1; background: color-mix(in oklch, var(--color-accent) 45%, var(--color-border)); border-radius: 2px; min-width: 2px; }
+.msg__wave span { flex: 1; background: color-mix(in oklch, var(--color-accent) 45%, var(--color-border)); border-radius: 2px; min-width: 2px; transform-origin: center; }
+.msg__wave.is-playing span { animation: wave-eq .9s ease-in-out infinite alternate; }
+.msg__wave.is-playing span:nth-child(3n)   { animation-delay: .15s; }
+.msg__wave.is-playing span:nth-child(3n+1) { animation-delay: .3s; }
+@keyframes wave-eq { from { transform: scaleY(.5); } to { transform: scaleY(1.2); } }
 .msg--out .msg__wave span { background: color-mix(in oklch, var(--color-accent) 60%, transparent); }
 .msg__voice-dur { font-family: var(--type-mono); font-size: 11px; color: var(--color-fg-muted); flex: none; }
 .msg__transcript { margin-top: 4px; padding-top: 5px; border-top: var(--hairline-width) dashed var(--color-border);
@@ -441,6 +445,7 @@ html, body { height: 100%; overflow: hidden; }
 .chat-back { display: none; }
 @media (max-width: 900px) {
   :root { --chat-list-w: 100%; --chat-info-w: 100%; }
+  .shell-search { display: none; }   /* список чата имеет свой поиск; глобальный — по кнопке-аватар/⌘K */
   .chat-list  { border-right: 0; }
   .chat-main, .chat-info { position: absolute; inset: 52px 0 0 0; z-index: 5; }
   /* view routing on mobile handled by [data-mobile] on .chat-body */

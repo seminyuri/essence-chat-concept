@@ -376,7 +376,7 @@ function renderMessages(c){
     if (m.fwd) body += `<div class="msg__fwd">${ic('forward','icon--xs')} Переслано от <b>${esc(m.fwd)}</b></div>`;
     if (showAuthor) body = `<div class="msg__author msg__author${AUTHOR_CLASS[m.from]||''}">${esc(from.name)}</div>` + body;
     if (m.media){ const pi = m.media.photo!=null ? m.media.photo : 0; body += `<div class="msg__media" data-photo="${pi}" title="Открыть на весь экран"><div style="aspect-ratio:4/3;background:${photoBg(pi)}"></div></div>${m.cap?`<div class="msg__mediacap">${esc(m.cap)}</div>`:''}`; }
-    if (m.file) body += `<div class="msg__file"><span class="msg__file-ic">${ic('file')}</span><div style="min-width:0"><div class="msg__file-nm">${esc(m.file.name)}</div><div class="msg__file-sz">${esc(m.file.size)}</div></div><button class="shell-icon-btn">${ic('download','icon--sm')}</button></div>`;
+    if (m.file) body += `<div class="msg__file"><span class="msg__file-ic">${ic('file')}</span><div style="min-width:0"><div class="msg__file-nm">${esc(m.file.name)}</div><div class="msg__file-sz">${esc(m.file.size)}</div></div><button class="shell-icon-btn" data-dl title="Скачать">${ic('download','icon--sm')}</button></div>`;
     if (m.voice){
       const bars = m.voice.wave.map(h=>`<span style="height:${Math.max(20,h*3)}%"></span>`).join('');
       body += `<div class="msg__voice"><button class="msg__voice-play">${ic('play','icon--sm')}</button><div class="msg__wave">${bars}</div><span class="msg__voice-dur">${esc(m.voice.dur)}</span></div>
@@ -511,7 +511,7 @@ function renderInfo(){
   if (S.infoTab==='media') tabBody = `<div class="info__media-grid">${Array.from({length:6}).map((_,i)=>`<div data-photo="${i%4}" style="aspect-ratio:1;border-radius:8px;background:${photoBg(i%4)};cursor:zoom-in"></div>`).join('')}</div>`;
   else tabBody = `<div class="empty-state" style="padding:36px 16px"><div class="empty-state__description">Пока пусто.</div></div>`;
 
-  p.innerHTML = `<div class="info__head"><button class="shell-icon-btn" data-closeinfo>${ic('x','icon--sm')}</button><div class="info__title">${title}</div><button class="shell-icon-btn">${ic('pen','icon--sm')}</button></div>
+  p.innerHTML = `<div class="info__head"><button class="shell-icon-btn" data-closeinfo>${ic('x','icon--sm')}</button><div class="info__title">${title}</div><button class="shell-icon-btn" data-hint="Редактирование — в полной версии">${ic('pen','icon--sm')}</button></div>
     <div class="info__scroll">${hero}${actions}${body}${tabs}${tabBody}</div>`;
 }
 
@@ -924,6 +924,7 @@ document.addEventListener('click', e=>{
   // settings entry
   if (t.closest('#meAvatar')){ renderSettings('profile'); return; }
   { const railI=t.closest('.shell-apprail__item'); if (railI && railI.title==='Настройки'){ renderSettings('appearance'); return; } }
+  { const railI2=t.closest('.shell-apprail__item'); if (railI2 && !railI2.classList.contains('is-active')){ toast('Модуль «'+(railI2.getAttribute('title')||'')+'» — часть экосистемы Суть'); return; } }
   if (t.closest('#bellBtn')){ const r=t.closest('#bellBtn').getBoundingClientRect(); notifDropdown(r.right, r.bottom+8); return; }
   // global search / cmdk
   if (t.closest('#globalSearch')){ cmdk(); return; }
@@ -949,6 +950,8 @@ document.addEventListener('click', e=>{
   }
   { const jr=t.closest('[data-jumpreply]'); if(jr){ flashMsg(jr.dataset.jumpreply); return; } }
   { const md=t.closest('[data-photo]'); if(md && !S.selMode){ lightbox(md.dataset.photo); return; } }
+  if (t.closest('.msg__voice-play')){ const b=t.closest('.msg__voice-play'); const playing=b.classList.toggle('is-playing'); const u=b.querySelector('use'); if(u)u.setAttribute('href', playing?'#i-pause':'#i-play'); b.closest('.msg__voice')?.querySelector('.msg__wave')?.classList.toggle('is-playing', playing); return; }
+  if (t.closest('[data-dl]')){ toast('Скачивание файла…'); return; }
   { const vt=t.closest('[data-vote]'); if(vt){ const ms=t.closest('.msg'); if(ms)votePoll(ms.dataset.mid,+vt.dataset.vote); return; } }
   // info tabs
   const it=t.closest('[data-infotab]'); if(it){ S.infoTab=it.dataset.infotab; renderInfo(); return; }
@@ -978,6 +981,11 @@ document.addEventListener('contextmenu', e=>{
   if (e.target.closest('#cmpSend')){ e.preventDefault(); const r=e.target.closest('#cmpSend').getBoundingClientRect(); popover(`<div class="menu" style="min-width:214px"><button class="menu__item" data-sendopt="silent">${ic('mute','icon--sm')} Отправить без звука</button><button class="menu__item" data-sendopt="schedule">${ic('clock','icon--sm')} Отправить позже</button></div>`, r.right-214, r.top-96); return; }
   const m=e.target.closest('.msg'); if(m){ e.preventDefault(); contextMenu(m.dataset.mid, e.clientX, e.clientY); }
 });
+// mobile: long-press a message opens the reaction row + actions
+let lpTimer;
+document.addEventListener('touchstart', e=>{ const m=e.target.closest('.msg'); if(m && !S.selMode && !e.target.closest('button,a,.msg__poll-opt')){ lpTimer=setTimeout(()=>{ const r=m.querySelector('.msg__bubble').getBoundingClientRect(); contextMenu(m.dataset.mid, Math.min(r.left+20, innerWidth-230), r.top); }, 450); } }, {passive:true});
+document.addEventListener('touchend', ()=>clearTimeout(lpTimer));
+document.addEventListener('touchmove', ()=>clearTimeout(lpTimer), {passive:true});
 // list search
 $('#listSearch').addEventListener('input', e=>{ S.search=e.target.value; renderList(); });
 // composer: enter to send, autosize
