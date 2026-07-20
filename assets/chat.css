@@ -577,6 +577,13 @@ mark.chat-hl { background: color-mix(in oklch, var(--color-accent) 38%, transpar
 .msg__linkprev-t { font-size: 13px; font-weight: 600; }
 .msg__linkprev-d { font-size: 12px; color: var(--color-fg-muted); }
 
+/* group/channel creation bits */
+.grp-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--color-border-strong); flex: none; display: grid; place-items: center; color: #fff; }
+.grp-check .icon { width: 13px; height: 13px; opacity: 0; }
+.grp-check.is-on { background: var(--color-accent); border-color: var(--color-accent); }
+.grp-check.is-on .icon { opacity: 1; }
+.grp-color.is-c { box-shadow: 0 0 0 2px var(--color-bg-elevated), 0 0 0 4px var(--color-fg); }
+
 /* ════════════════════════ SETTINGS ════════════════════════ */
 .set { position: fixed; inset: 0; z-index: 90; background: var(--color-bg); display: flex; flex-direction: column; overflow: hidden; }
 .set__top { flex: none; height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 8px;

@@ -55,12 +55,20 @@ const CHATS = {
       last:{by:'me', txt:'Пароли от стенда', t:'пн'}, unread:0 },
   ],
   sushi: [
-    { id:'shift', type:'group',   title:'Филиал Центр · смена', av:'e', s:'ЦС', folder:'work', members:['me','dmitry','sveta'],
-      last:{by:'dmitry', txt:'Касса сошлась, всё ок', t:'21:40'}, unread:5, pinned:true },
-    { id:'dmitry',type:'dm',      title:'Дмитрий Кан', user:'dmitry', av:'g', s:'ДК', folder:'work',
+    { id:'upr',   type:'group',   title:'Суши Мама · Управление', av:'a', s:'СМ', folder:'upr', members:['me','dmitry','sveta','anya'],
+      last:{by:'me', txt:'План на неделю — в закрепе', t:'09:30', read:true}, unread:0, pinned:true },
+    { id:'shift', type:'group',   title:'Филиал Центр · смена', av:'e', s:'ЦС', folder:'center', members:['me','dmitry','sveta'],
+      last:{by:'dmitry', txt:'Касса сошлась, всё ок', t:'21:40'}, unread:5 },
+    { id:'dmitry',type:'dm',      title:'Дмитрий Кан', user:'dmitry', av:'g', s:'ДК', folder:'center',
       last:{by:'me', txt:'Отчёт по югу пришли к утру', t:'20:10', read:true}, unread:0 },
+    { id:'south', type:'group',   title:'Филиал Юг · смена', av:'c', s:'ЮС', folder:'south', members:['me','sveta'],
+      last:{by:'sveta', txt:'Открылись, всё по плану', t:'10:05'}, unread:2 },
+    { id:'sveta', type:'dm',      title:'Света (Юг)', user:'sveta', av:'d', s:'С', folder:'south',
+      last:{by:'sveta', txt:'Списание по акции сделала', t:'19:40', read:true}, unread:0 },
     { id:'supply',type:'external',title:'Игорь · Рыба Норд', user:'igor', av:'c', s:'РН', folder:'suppliers',
       last:{by:'igor', txt:'Привезём в четверг к 9:00', t:'18:22'}, unread:0 },
+    { id:'smann', type:'channel', title:'Суши Мама · Приказы', av:'e', s:'📣', icon:'hash',
+      last:{by:'sys', txt:'Новое меню с понедельника', t:'вчера'}, unread:0, subscribers:48 },
   ],
   izum: [
     { id:'lena', type:'dm', title:'Лена', user:'lena', av:'f', s:'Л', last:{by:'lena', txt:'Смету скинула', t:'вчера'}, unread:0 },
@@ -115,6 +123,16 @@ const MSGS = {
     { from:'dmitry',t:'21:20', text:'Центр тоже. Сейчас сведу кассу.' },
     { from:'dmitry',t:'21:40', text:'Касса сошлась, всё ок', readBy:['me','sveta'] },
   ],
+  upr: [
+    { from:'me', day:'Сегодня', t:'09:30', text:'Коллеги, план на неделю закрепил сверху. Вопросы и блокеры — сюда.' },
+    { from:'dmitry', t:'09:40', text:'Принял. По Центру всё в графике.' },
+    { from:'sveta', t:'09:42', text:'Юг тоже 👍', reacts:[{e:'🔥', by:['me'], mine:true}] },
+    { from:'anya', t:'09:55', text:'Напомню: в пятницу инвентаризация в обоих филиалах.' },
+  ],
+  south: [
+    { from:'sveta', day:'Сегодня', t:'10:00', text:'Доброе утро! Открываемся.' },
+    { from:'sveta', t:'10:05', text:'Открылись, всё по плану', readBy:['me'] },
+  ],
   yuia: [
     { from:'yuia', t:'вчера', text:'Привет! Я Юя — помогу найти сообщение, собрать саммари чата или составить ответ. Просто напиши.' },
   ],
@@ -124,13 +142,13 @@ function lightThread(c){
   return [{ from: who==='sys'?'sys':who, service: c.last.by==='sys', t:c.last.t, text:c.last.txt, read:c.last.read }];
 }
 
-const FOLDERS = [
-  { id:'all',       name:'Все' },
-  { id:'unread',    name:'Непрочитанные' },
-  { id:'work',      name:'Работа' },
-  { id:'clients',   name:'Клиенты' },
-  { id:'suppliers', name:'Поставщики' },
-];
+const FOLDERS_BY_ORG = {
+  sut:      [ {id:'all',name:'Все'}, {id:'unread',name:'Непроч.'}, {id:'work',name:'Работа'}, {id:'clients',name:'Клиенты'} ],
+  sushi:    [ {id:'all',name:'Все'}, {id:'unread',name:'Непроч.'}, {id:'center',name:'Филиал Центр'}, {id:'south',name:'Филиал Юг'}, {id:'upr',name:'Управление'}, {id:'suppliers',name:'Поставщики'} ],
+  izum:     [ {id:'all',name:'Все'}, {id:'unread',name:'Непроч.'} ],
+  personal: [ {id:'all',name:'Все'} ],
+};
+const foldersFor = org => FOLDERS_BY_ORG[org] || FOLDERS_BY_ORG.sut;
 
 /* ─────────────────────────── STATE ─────────────────────────── */
 const P = new URLSearchParams(location.search);
@@ -177,7 +195,7 @@ function renderWorkspace(){
 /* ─────────────────────────── RENDER: folders ─────────────────────────── */
 function renderFolders(){
   const list = chatsFor(S.org);
-  $('#folders').innerHTML = FOLDERS.map(f=>{
+  $('#folders').innerHTML = foldersFor(S.org).map(f=>{
     let n = 0;
     if (f.id==='all') n = list.reduce((a,c)=>a+(S.read[c.id]?0:c.unread||0),0);
     else if (f.id==='unread') n = list.filter(c=>!S.read[c.id] && c.unread>0).length;
@@ -585,7 +603,8 @@ function newChatMenu(x=innerWidth/2,y=180){
       <div class="menu__sep"></div>
       <button class="menu__item" data-nc="invite">${ic('user-plus','icon--sm')} Пригласить клиента / внешнего по ссылке</button>
     </div>`,'sm');
-  OV.addEventListener('click',e=>{ const b=e.target.closest('[data-nc]'); if(!b)return; closeOverlays(); b.dataset.nc==='invite'?inviteModal():toast('«'+b.querySelector('.icon')?.nextSibling?.textContent?.trim()+'» — в полной версии'); });
+  OV.addEventListener('click',e=>{ const b=e.target.closest('[data-nc]'); if(!b)return; const k=b.dataset.nc; closeOverlays();
+    if(k==='invite')inviteModal(); else if(k==='dm')contactPicker(); else if(k==='group')newGroupModal(); else if(k==='channel')newChannelModal(); });
 }
 
 /* invite modal — the differentiator: link + natal-data toggle */
@@ -612,6 +631,78 @@ function inviteModal(){
   render();
   OV.addEventListener('change',e=>{ if(e.target.id==='reqNatal'){requireNatal=e.target.checked; render();} });
   OV.addEventListener('click',e=>{ if(e.target.closest('[data-copylink]')){navigator.clipboard?.writeText('https://chat.the-essence.ai/join/'+(requireNatal?'c':'x')+'-8f2a91'); toast('Ссылка скопирована');} });
+}
+
+/* new DM — contact picker */
+function contactPicker(){
+  const users = ['anya','mark','vera','alena','maria','dmitry','sveta','igor','lena','yuia'].filter(id=>U[id]);
+  modal(`<div class="modal__header"><div class="modal__title">Новое сообщение</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body" style="max-height:56vh;padding-top:12px">
+      <label class="chat-search" style="margin-bottom:10px">${ic('search','icon--sm')}<input id="cpq" placeholder="Кому написать…" style="border:0;background:none;outline:none;font:inherit;flex:1"></label>
+      <div id="cplist">${users.map(id=>`<button class="info__member" style="width:100%" data-dm="${id}">${AVATAR(U[id])}<div class="info__member-b"><div class="info__member-nm">${esc(U[id].name)}</div><div class="info__member-pr${U[id].pr==='online'?' info__member-pr--online':''}">${presenceLabel(U[id])}</div></div></button>`).join('')}</div>
+    </div>`,'sm');
+  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-dm]'); if(b){ closeOverlays(); startDM(b.dataset.dm); } });
+  const q=$('#cpq'); if(q) q.addEventListener('input',()=>{ const v=q.value.toLowerCase(); $$('#cplist [data-dm]').forEach(el=>{ el.style.display=U[el.dataset.dm].name.toLowerCase().includes(v)?'':'none'; }); });
+}
+function startDM(uid){
+  const u=U[uid]; let c=chatsFor(S.org).find(x=>x.user===uid);
+  if(!c){ c={ id:'dm_'+uid+'_'+uid, type:u.kind==='client'?'client':u.kind==='external'?'external':(u.kind==='bot'?'dm':'dm'), title:u.name, user:uid, av:u.av, s:u.s, folder:'all', last:{by:'me',txt:'Чат создан',t:nowT(),read:true}, unread:0 }; CHATS[S.org].unshift(c); }
+  openChat(c.id);
+}
+
+/* new group — 2 steps */
+function newGroupModal(){
+  const chosen=new Set(); let step=1; let color='a';
+  const pool=['anya','mark','vera','alena','dmitry','sveta','lena'].filter(id=>U[id]);
+  const updChips=()=>{ const el=$('#grpchips'); if(el) el.innerHTML=[...chosen].map(id=>`<span class="chip chip--accent">${esc(U[id].name.split(' ')[0])}</span>`).join('')||'<span class="text-subtle" style="font-size:12.5px">Никого не выбрано</span>'; const nx=$('[data-next]'); if(nx)nx.disabled=!chosen.size; $$('.grp-check').forEach(c=>c.classList.toggle('is-on',chosen.has(c.dataset.c))); };
+  const render=()=>{
+    if(step===1){
+      modal(`<div class="modal__header"><div class="modal__title">Новая группа · участники</div><button class="modal__close" data-close>✕</button></div>
+        <div class="modal__body" style="max-height:52vh"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="grpchips"></div>
+          ${pool.map(id=>`<button class="info__member" style="width:100%" data-pick="${id}">${AVATAR(U[id])}<div class="info__member-b"><div class="info__member-nm">${esc(U[id].name)}</div></div><span class="grp-check" data-c="${id}">${ic('check','icon--xs')}</span></button>`).join('')}</div>
+        <div class="modal__footer"><span class="chat-bulk__sp"></span><button class="btn btn--primary btn--md" data-next disabled>Далее →</button></div>`,'sm');
+      updChips();
+    } else {
+      modal(`<div class="modal__header"><div class="modal__title">Новая группа</div><button class="modal__close" data-close>✕</button></div>
+        <div class="modal__body">
+          <div style="display:flex;gap:14px;align-items:center;margin-bottom:18px"><span class="chat-avatar chat-avatar--${color}" style="width:60px;height:60px;font-size:22px" id="grpav">Г</span>
+            <label class="field" style="flex:1"><span class="field__label">Название группы</span><input class="input" id="grpname" placeholder="Например: Проект X"></label></div>
+          <div class="field"><span class="field__label">Цвет</span><div class="set__swatches">${['a','b','c','d','e','f'].map(cc=>`<button class="chat-avatar chat-avatar--${cc} grp-color${cc===color?' is-c':''}" data-color="${cc}" style="width:34px;height:34px;font-size:0"></button>`).join('')}</div></div>
+          <div class="field__hint" style="margin-top:14px">${chosen.size} участник(ов) + вы</div></div>
+        <div class="modal__footer"><button class="btn btn--ghost btn--md" data-back>Назад</button><button class="btn btn--primary btn--md" data-create>Создать</button></div>`,'sm');
+    }
+  };
+  render();
+  OV.addEventListener('click', e=>{
+    const p=e.target.closest('[data-pick]'); if(p){ const id=p.dataset.pick; chosen.has(id)?chosen.delete(id):chosen.add(id); updChips(); return; }
+    if(e.target.closest('[data-next]')){ step=2; render(); return; }
+    if(e.target.closest('[data-back]')){ step=1; render(); updChips(); return; }
+    const col=e.target.closest('[data-color]'); if(col){ color=col.dataset.color; $$('.grp-color').forEach(x=>x.classList.remove('is-c')); col.classList.add('is-c'); const av=$('#grpav'); if(av)av.className='chat-avatar chat-avatar--'+color; return; }
+    if(e.target.closest('[data-create]')){ const name=$('#grpname')?.value.trim()||'Новая группа'; const c={ id:'g_'+uid(), type:'group', title:name, av:color, s:name.replace(/[^\p{L}]/gu,'').slice(0,2).toUpperCase()||'Г', folder:'all', members:['me',...chosen], last:{by:'me',txt:'Группа создана',t:nowT(),read:true}, unread:0 }; CHATS[S.org].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'<b>Вы</b> создали группу «'+esc(name)+'»'}]; closeOverlays(); openChat(c.id); toast('Группа создана'); return; }
+  });
+}
+
+/* new channel */
+function newChannelModal(){
+  modal(`<div class="modal__header"><div class="modal__title">Новый канал</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body">
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px"><span class="chat-avatar chat-avatar--e" style="width:60px;height:60px">${ic('hash')}</span>
+        <label class="field" style="flex:1"><span class="field__label">Название канала</span><input class="input" id="chname" placeholder="Например: Анонсы"></label></div>
+      <label class="field" style="margin-bottom:14px"><span class="field__label">Описание</span><textarea class="input" style="height:auto;min-height:60px;padding:10px 12px" placeholder="О чём канал"></textarea></label>
+      <div class="set__card"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Публичный</div><div class="set__item-d">Виден по ссылке всем в организации</div></div><label class="toggle"><input type="checkbox" class="toggle__input" checked><span class="toggle__track"><span class="toggle__thumb"></span></span></label></div></div></div>
+    <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-createch>Создать</button></div>`,'sm');
+  OV.addEventListener('click', e=>{ if(e.target.closest('[data-createch]')){ const name=$('#chname')?.value.trim()||'Новый канал'; const c={id:'ch_'+uid(),type:'channel',title:name,av:'e',s:'📣',icon:'hash',folder:'all',last:{by:'sys',txt:'Канал создан',t:nowT()},unread:0,subscribers:1}; CHATS[S.org].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'Канал «'+esc(name)+'» создан'}]; closeOverlays(); openChat(c.id); toast('Канал создан'); } });
+}
+
+/* avatar crop */
+function avatarCropModal(){
+  modal(`<div class="modal__header"><div class="modal__title">Фото профиля</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body" style="text-align:center">
+      <div style="width:180px;height:180px;border-radius:50%;margin:0 auto 18px;overflow:hidden;background:linear-gradient(140deg,#C98F68,#9A6E55);display:grid;place-items:center;color:#fff;font-size:56px;font-family:var(--font-display);font-weight:700" id="cropav">ЮС</div>
+      <label class="field" style="max-width:260px;margin:0 auto"><span class="field__label" style="text-align:left">Масштаб</span><input type="range" min="1" max="2" step="0.01" value="1.2" style="width:100%;accent-color:var(--color-accent)" id="cropzoom"></label>
+      <div class="jn__note" style="max-width:300px;margin:16px auto 0">${ic('image','icon--sm')} Перетащи фото, чтобы кадрировать. В прототипе — превью масштаба.</div></div>
+    <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-close>Готово</button></div>`,'sm');
+  const z=$('#cropzoom'); if(z) z.addEventListener('input',()=>{ const av=$('#cropav'); if(av) av.style.fontSize=(40*+z.value)+'px'; });
 }
 
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
@@ -844,7 +935,7 @@ function renderSettings(sec){
     const nav=e.target.closest('[data-set-nav]'); if(nav){ $$('.set__navitem',wrap).forEach(x=>x.classList.remove('is-active')); nav.classList.add('is-active'); $('#setContent',wrap).innerHTML=settingsSection(nav.dataset.setNav); return; }
     const sv=e.target.closest('[data-seg-val]'); if(sv){ const seg=sv.closest('[data-seg]').dataset.seg; applySetting(seg, sv.dataset.segVal); $$('.segmented__option',sv.parentElement).forEach(x=>x.classList.remove('segmented__option--active')); sv.classList.add('segmented__option--active'); return; }
     const ps=e.target.closest('[data-persona-set]'); if(ps){ const v=ps.dataset.personaSet; if(v)document.documentElement.setAttribute('data-persona',v); else document.documentElement.removeAttribute('data-persona'); $$('.set__swatch',wrap).forEach(x=>x.classList.remove('is-active')); ps.classList.add('is-active'); return; }
-    if (e.target.closest('[data-avedit]')){ toast('Загрузка и кадрирование фото — в полной версии'); return; }
+    if (e.target.closest('[data-avedit]')){ avatarCropModal(); return; }
   };
 }
 function applySetting(kind,val){
