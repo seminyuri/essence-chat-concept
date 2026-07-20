@@ -142,6 +142,26 @@ const MSGS = {
     { from:'sveta', day:'Сегодня', t:'10:00', text:'Доброе утро! Открываемся.' },
     { from:'sveta', t:'10:05', text:'Открылись, всё по плану', readBy:['me'] },
   ],
+  dmitry: [
+    { from:'me', day:'Сегодня', t:'20:00', text:'Дим, как по Центру за смену?' },
+    { from:'dmitry', t:'20:05', text:'Плюс 8% к плану, всё чисто ✅' },
+    { from:'me', t:'20:10', text:'Отчёт по югу пришли к утру', read:true },
+  ],
+  sveta: [
+    { from:'sveta', day:'Сегодня', t:'19:30', text:'Списание по акции сделала, остатки в норме.' },
+    { from:'me', t:'19:38', text:'Супер, спасибо 🙌', read:true },
+  ],
+  lena: [
+    { from:'lena', day:'Вчера', t:'16:15', text:'Юр, привет! Скинула смету по объекту.' },
+    { from:'lena', t:'16:15', file:{name:'Смета_объект.xlsx', size:'340 КБ'} },
+    { from:'me', t:'16:42', text:'Принял, гляну вечером 🙏', read:true },
+    { from:'lena', t:'16:44', text:'Ок, жду 👍', reacts:[{e:'👍', by:['me'], mine:true}] },
+  ],
+  izteam: [
+    { from:'lena', day:'Сегодня', t:'11:00', text:'Собрали ядро по Изумрудиуму — что в приоритете на неделю?' },
+    { from:'me', t:'11:20', text:'Сначала лендинг, потом интеграция оплаты.', read:true },
+    { from:'me', t:'11:21', text:'Ок, смотрю' },
+  ],
   yuia: [
     { from:'yuia', t:'вчера', text:'Привет! Я Юя — помогу найти сообщение, собрать саммари чата или составить ответ. Просто напиши.' },
   ],
@@ -190,7 +210,7 @@ const threadOf = c => MSGS[c.id] || lightThread(c);
 /* ─────────────────────────── RENDER: workspace ─────────────────────────── */
 function renderWorkspace(){
   const isAll = S.org==='all';
-  const o = isAll ? {name:'Все организации', logo:'∀'} : ORGS[S.org];
+  const o = isAll ? {name:'Все организации', logo:'∀'} : (ORGS[S.org] || ORGS.sut);
   $('#orgLogo').textContent = o.logo;
   $('#orgName').textContent = o.name;
   $('#orgRole').textContent = isAll ? `${Object.keys(ORGS).length} организации · глобально` : (S.org==='sut'?'Основатель':S.org==='personal'?'Личное пространство':'Администратор');
@@ -453,10 +473,10 @@ function renderInfo(){
   const isPerson = u && (c.type==='dm'||c.type==='client'||c.type==='external');
   let hero = `<div class="info__hero">${chatAvatar(c).replace('chat-avatar ','chat-avatar ')}<div class="info__hero-name">${esc(c.title)}</div><div class="info__hero-sub${u&&u.pr==='online'?' info__hero-sub--online':''}">${c.type==='group'?(c.members.length+' участников'):c.type==='channel'?(c.subscribers+' подписчиков'):u?presenceLabel(u):''}</div></div>`;
   let actions = `<div class="info__actions">
-    <button class="info__act"><span class="info__act-ic">${ic('phone','icon--sm')}</span>Звонок</button>
-    <button class="info__act"><span class="info__act-ic">${ic('video','icon--sm')}</span>Видео</button>
-    <button class="info__act"><span class="info__act-ic">${ic('mute','icon--sm')}</span>${c.muted?'Вкл.':'Без звука'}</button>
-    <button class="info__act"><span class="info__act-ic">${ic('search','icon--sm')}</span>Поиск</button>
+    <button class="info__act" data-call="audio"><span class="info__act-ic">${ic('phone','icon--sm')}</span>Звонок</button>
+    <button class="info__act" data-call="video"><span class="info__act-ic">${ic('video','icon--sm')}</span>Видео</button>
+    <button class="info__act" data-infomute><span class="info__act-ic">${ic(c.muted?'bell':'mute','icon--sm')}</span>${c.muted?'Вкл. звук':'Без звука'}</button>
+    <button class="info__act" data-chatsearch><span class="info__act-ic">${ic('search','icon--sm')}</span>Поиск</button>
   </div>`;
   let body = '';
   if (u?.bio) body += `<div class="info__sec"><div class="info__label">О контакте</div><div class="info__bio">${esc(u.bio)}</div></div>`;
@@ -476,7 +496,7 @@ function renderInfo(){
   // members for group
   if (c.type==='group'){
     body += `<div class="info__sec" style="padding:8px 16px"><button class="info__member" style="width:100%;padding:6px 0" data-groupadmin><span class="info__addmembers-ic">${ic('shield','icon--sm')}</span><div class="info__member-b"><div class="info__member-nm">Права и управление</div><div class="info__member-pr">роли · кто что может · медленный режим</div></div>${ic('chev-r','icon--sm')}</button></div>`;
-    body += `<div class="info__addmembers"><span class="info__addmembers-ic">${ic('user-plus','icon--sm')}</span>Добавить участников</div>`;
+    body += `<div class="info__addmembers" data-addmembers><span class="info__addmembers-ic">${ic('user-plus','icon--sm')}</span>Добавить участников</div>`;
     const roles = { me:'owner', anya:'admin', dmitry:'admin' };
     body += (c.members||[]).map(id=>{
       const mu = U[id]||{name:id,av:'c',s:'?'}; const r = roles[id];
@@ -488,7 +508,7 @@ function renderInfo(){
     ${['media','files','links','voice'].map(t=>`<button class="info__tab${t===S.infoTab?' is-active':''}" data-infotab="${t}">${({media:'Медиа',files:'Файлы',links:'Ссылки',voice:'Голос'})[t]}</button>`).join('')}
   </div>`;
   let tabBody = '';
-  if (S.infoTab==='media') tabBody = `<div class="info__media-grid">${Array.from({length:6}).map((_,i)=>`<div style="aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,var(--cal-${['rose','sage','teal','amber','blush','clay'][i]}),var(--color-accent-strong))"></div>`).join('')}</div>`;
+  if (S.infoTab==='media') tabBody = `<div class="info__media-grid">${Array.from({length:6}).map((_,i)=>`<div data-photo="${i%4}" style="aspect-ratio:1;border-radius:8px;background:${photoBg(i%4)};cursor:zoom-in"></div>`).join('')}</div>`;
   else tabBody = `<div class="empty-state" style="padding:36px 16px"><div class="empty-state__description">Пока пусто.</div></div>`;
 
   p.innerHTML = `<div class="info__head"><button class="shell-icon-btn" data-closeinfo>${ic('x','icon--sm')}</button><div class="info__title">${title}</div><button class="shell-icon-btn">${ic('pen','icon--sm')}</button></div>
@@ -910,12 +930,15 @@ document.addEventListener('click', e=>{
   // new chat
   if (t.closest('#newChatBtn')){ newChatMenu(); return; }
   // conversation header
-  if (t.closest('[data-openinfo]')){ toggleInfo(true); return; }
+  if (t.closest('[data-openinfo]')){ closeOverlays(); toggleInfo(true); return; }
   if (t.closest('[data-closeinfo]')){ toggleInfo(false); if(innerWidth<=900)$('#chatBody').setAttribute('data-mobile','chat'); return; }
+  if (t.closest('[data-infomute]')){ closeOverlays(); const c=findChat(S.chatId); if(c){ c.muted=!c.muted; toast(c.muted?'Уведомления отключены':'Уведомления включены'); renderInfo(); renderList(); } return; }
+  if (t.closest('[data-addmembers]')){ toast('Добавление участников — выбери контакты'); return; }
+  if (t.closest('[data-hint]')){ toast(t.closest('[data-hint]').dataset.hint); closeOverlays(); return; }
   if (t.closest('[data-mobile-back]')){ $('#chatBody').setAttribute('data-mobile','list'); return; }
   if (t.closest('[data-chatmenu]')){ const r=t.closest('[data-chatmenu]').getBoundingClientRect(); chatHeaderMenu(r.right-200,r.bottom+6); return; }
   if (t.closest('[data-call]')){ callOverlay(S.chatId, t.closest('[data-call]').dataset.call); return; }
-  if (t.closest('[data-chatsearch]')){ S.csearch=''; renderConversation(); return; }
+  if (t.closest('[data-chatsearch]')){ closeOverlays(); if(innerWidth<=900)$('#chatBody').setAttribute('data-mobile','chat'); S.csearch=''; renderConversation(); return; }
   if (t.closest('[data-csclose]')){ S.csearch=null; renderConversation(); return; }
   { const cn=t.closest('[data-csnav]'); if(cn){ csNav(+cn.dataset.csnav); return; } }
   if (t.closest('[data-jumppin]')){ const th=threadOf(findChat(S.chatId)); flashMsg(th[+t.closest('[data-jumppin]').dataset.jumppin].id); return; }
@@ -925,7 +948,7 @@ document.addEventListener('click', e=>{
     const ms=t.closest('.msg'); if(ms){ const id=ms.dataset.mid; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); ms.classList.toggle('is-selected'); const bn=$('#bulkN'); if(bn)bn.textContent=S.sel.size+' выбрано'; if(S.sel.size===0)exitSel(); return; }
   }
   { const jr=t.closest('[data-jumpreply]'); if(jr){ flashMsg(jr.dataset.jumpreply); return; } }
-  { const md=t.closest('.msg__media'); if(md && !S.selMode){ lightbox(md.dataset.photo); return; } }
+  { const md=t.closest('[data-photo]'); if(md && !S.selMode){ lightbox(md.dataset.photo); return; } }
   { const vt=t.closest('[data-vote]'); if(vt){ const ms=t.closest('.msg'); if(ms)votePoll(ms.dataset.mid,+vt.dataset.vote); return; } }
   // info tabs
   const it=t.closest('[data-infotab]'); if(it){ S.infoTab=it.dataset.infotab; renderInfo(); return; }
@@ -980,13 +1003,13 @@ document.addEventListener('input', e=>{
 });
 
 function chatHeaderMenu(x,y){
-  popover(`<div class="menu" style="min-width:200px">
+  popover(`<div class="menu" style="min-width:210px">
     <button class="menu__item" data-openinfo>${ic('info','icon--sm')} Информация</button>
-    <button class="menu__item">${ic('search','icon--sm')} Поиск в чате</button>
-    <button class="menu__item">${ic('mute','icon--sm')} Без звука</button>
-    <button class="menu__item">${ic('pin','icon--sm')} Закрепить чат</button>
+    <button class="menu__item" data-chatsearch>${ic('search','icon--sm')} Поиск в чате</button>
+    <button class="menu__item" data-infomute>${ic('mute','icon--sm')} Уведомления</button>
+    <button class="menu__item" data-hint="Чат закреплён вверху">${ic('pin','icon--sm')} Закрепить чат</button>
     <div class="menu__sep"></div>
-    <button class="menu__item menu__item--danger">${ic('trash','icon--sm')} Очистить историю</button>
+    <button class="menu__item menu__item--danger" data-hint="История очищена">${ic('trash','icon--sm')} Очистить историю</button>
   </div>`, x, y);
 }
 function attachMenu(x,y){
@@ -1181,6 +1204,7 @@ function renderJoin(req){
 /* ─────────────────────────── BOOT ─────────────────────────── */
 function boot(){
   for(const cid in MSGS) MSGS[cid].forEach((m,i)=>{ if(!m.id) m.id='m'+i; });
+  if (S.org!=='all' && !ORGS[S.org]) { S.org='sut'; localStorage.setItem('sut-chat:org','sut'); document.documentElement.removeAttribute('data-org'); }
   if (P.get('view')==='join'){ renderJoin(P.get('req')!=='0'); return; }
   if (P.get('view')==='settings'){ renderAll(); renderSettings(P.get('sec')); return; }
   renderAll();

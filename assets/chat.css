@@ -453,6 +453,8 @@ html, body { height: 100%; overflow: hidden; }
   .chat-back { display: grid; }
   .chat-scroll { padding: 12px 10px 8px; }
   .cmp { padding: 8px 10px 12px; }
+  .chat-ribbon { font-size: 12px; }
+  .chat-ribbon__act { white-space: nowrap; flex: none; }
   .shell-apprail { display: none; }        /* app-rail collapses into bottom nav on mobile */
 }
 
