@@ -767,6 +767,25 @@ function avatarCropModal(){
   const z=$('#cropzoom'); if(z) z.addEventListener('input',()=>{ const av=$('#cropav'); if(av) av.style.fontSize=(40*+z.value)+'px'; });
 }
 
+/* create poll */
+function pollCreateModal(){
+  let q='', opts=['',''];
+  const render=()=> modal(`<div class="modal__header"><div class="modal__title">Новый опрос</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body">
+      <label class="field" style="margin-bottom:16px"><span class="field__label">Вопрос</span><input class="input" id="pq" placeholder="Задайте вопрос" value="${esc(q)}"></label>
+      <div class="field__label" style="margin-bottom:8px">Варианты ответа</div>
+      <div id="popts" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">${opts.map((o,i)=>`<input class="input" data-oi="${i}" placeholder="Вариант ${i+1}" value="${esc(o)}">`).join('')}</div>
+      ${opts.length<6?`<button class="btn btn--ghost btn--sm" data-addopt>${ic('plus','icon--sm')} Добавить вариант</button>`:''}
+    </div>
+    <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-pollcreate>Создать</button></div>`,'sm');
+  const sync=()=>{ const pq=$('#pq'); if(pq)q=pq.value; $$('#popts [data-oi]').forEach(i=>opts[+i.dataset.oi]=i.value); };
+  render();
+  OV.addEventListener('click', e=>{
+    if(e.target.closest('[data-addopt]')){ sync(); if(opts.length<6)opts.push(''); render(); return; }
+    if(e.target.closest('[data-pollcreate]')){ sync(); const question=q.trim()||'Опрос'; const clean=opts.map(o=>o.trim()).filter(Boolean); if(clean.length<2){ toast('Нужно минимум 2 варианта'); return; } const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(),from:'me',t:nowT(),poll:{q:question,options:clean.map(t=>({t,v:0})),total:0,voted:null},read:false}); c.last={by:'me',txt:'📊 '+question,t:nowT(),read:false}; closeOverlays(); renderConversation(); renderList(); toast('Опрос создан'); return; }
+  });
+}
+
 /* call overlay — audio / video, 1:1 & group */
 let callTimer;
 function callOverlay(chatId, kind){
@@ -1049,6 +1068,7 @@ function attachMenu(x,y){
   </div>`, x, y-260);
   OV.addEventListener('click',e=>{ const it=e.target.closest('.menu__item'); if(!it) return; const label=it.textContent.trim(); closeOverlays();
     if(/Фото/.test(label)){ photoPreview(); return; }
+    if(/Опрос/.test(label)){ pollCreateModal(); return; }
     const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice();
     if(/Документ/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),file:{name:'Бриф.pdf',size:'2,4 МБ'},read:false}); c.last={by:'me',txt:'📎 Бриф.pdf',t:nowT(),read:false}; }
     else { toast(label+' — в полной версии'); return; }
