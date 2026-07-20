@@ -204,7 +204,8 @@ const S = {
   archiveView: false,
   unreadAt: null,   // index of first unread message in the open chat (Telegram divider)
 };
-const PINS = { team: 3 };  // chatId -> pinned message index
+const PINS = { team: [0, 3] };  // chatId -> array of pinned message indices (newest last)
+const PINCUR = {};             // chatId -> which pin the bar currently shows
 
 const userOf = c => U[c.user] || null;
 const chatsFor = org => org==='all'
@@ -348,9 +349,11 @@ function renderConversation(){
     ribbon = `<div class="chat-ribbon chat-ribbon--ok">${ic('globe','icon--sm')} Внешний контакт · вход через ${esc(u?.via||'MAX')} · натал-данные не запрашиваются</div>`;
   }
 
-  const pinnedIdx = PINS[c.id];
-  const pinnedMsg = pinnedIdx!=null ? threadOf(c)[pinnedIdx] : null;
-  const pinBar = pinnedMsg ? `<div class="chat-pinned" data-jumppin="${pinnedIdx}"><span class="chat-pinned__bar"></span><div class="chat-pinned__b"><div class="chat-pinned__lbl">Закреплённое</div><div class="chat-pinned__tx">${esc(pinnedMsg.text||'вложение')}</div></div><button class="shell-icon-btn" data-unpin title="Открепить">${ic('x','icon--sm')}</button></div>` : '';
+  const pins = PINS[c.id] || [];
+  const pinCur = pins.length ? (((PINCUR[c.id] ?? (pins.length-1)) % pins.length) + pins.length) % pins.length : 0;
+  const pinnedMsg = pins.length ? threadOf(c)[pins[pinCur]] : null;
+  const pinTx = m => m.text || m.poll?.q || (m.media!=null?'Фото':m.file?m.file.name:m.voice?'Голосовое':'вложение');
+  const pinBar = pinnedMsg ? `<div class="chat-pinned" data-pincycle><span class="chat-pinned__bar"></span><div class="chat-pinned__b"><div class="chat-pinned__lbl">Закреплённое${pins.length>1?` · ${pinCur+1}/${pins.length}`:''}</div><div class="chat-pinned__tx">${esc(pinTx(pinnedMsg))}</div></div><button class="shell-icon-btn" data-unpin title="Открепить">${ic('x','icon--sm')}</button></div>` : '';
   const searchBar = S.csearch!=null ? `<div class="chat-search-bar"><div class="chat-search-bar__in">${ic('search','icon--sm')}<input id="csIn" placeholder="Поиск в этом чате" value="${esc(S.csearch)}"></div><span class="chat-search-bar__count" id="csCount"></span><button class="shell-icon-btn" data-csnav="-1" title="Выше"><svg class="icon icon--sm" style="transform:rotate(180deg)"><use href="#i-chev-d"/></svg></button><button class="shell-icon-btn" data-csnav="1" title="Ниже">${ic('chev-d','icon--sm')}</button><button class="shell-icon-btn" data-csclose title="Закрыть">${ic('x','icon--sm')}</button></div>` : '';
   const bottom = S.selMode ? bulkBar() : renderComposer(c);
   main.innerHTML =
@@ -621,7 +624,7 @@ function onContext(cmd, mid){
   else if (cmd==='copy') { navigator.clipboard?.writeText(m.text||''); toast('Скопировано'); }
   else if (cmd==='edit') { S.editId=mid; S.reply=null; renderConversation(); const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); inp.closest('.cmp__bar')?.classList.add('has-text');} }
   else if (cmd==='delete'){ const th=MSGS[c.id]=threadOf(c).slice(); const i=th.findIndex(x=>x.id===mid); if(i>-1)th.splice(i,1); renderConversation(); toast('Сообщение удалено'); }
-  else if (cmd==='pin'){ PINS[S.chatId]=threadOf(c).findIndex(x=>x.id===mid); renderConversation(); toast('Закреплено'); }
+  else if (cmd==='pin'){ const idx=threadOf(c).findIndex(x=>x.id===mid); PINS[S.chatId]=PINS[S.chatId]||[]; if(!PINS[S.chatId].includes(idx)) PINS[S.chatId].push(idx); PINCUR[S.chatId]=PINS[S.chatId].length-1; renderConversation(); toast('Закреплено'); }
   else if (cmd==='forward') forwardPicker(mid);
   else if (cmd==='select'){ S.selMode=true; S.sel=new Set([mid]); renderConversation(); }
 }
@@ -1056,8 +1059,8 @@ document.addEventListener('click', e=>{
   if (t.closest('[data-chatsearch]')){ closeOverlays(); if(innerWidth<=900)$('#chatBody').setAttribute('data-mobile','chat'); S.csearch=''; renderConversation(); return; }
   if (t.closest('[data-csclose]')){ S.csearch=null; renderConversation(); return; }
   { const cn=t.closest('[data-csnav]'); if(cn){ csNav(+cn.dataset.csnav); return; } }
-  if (t.closest('[data-jumppin]')){ const th=threadOf(findChat(S.chatId)); flashMsg(th[+t.closest('[data-jumppin]').dataset.jumppin].id); return; }
-  if (t.closest('[data-unpin]')){ delete PINS[S.chatId]; renderConversation(); toast('Откреплено'); return; }
+  if (t.closest('[data-unpin]')){ const c=findChat(S.chatId); const pins=PINS[c.id]||[]; if(pins.length){ const cur=(((PINCUR[c.id]??(pins.length-1))%pins.length)+pins.length)%pins.length; pins.splice(cur,1); if(!pins.length) delete PINS[c.id]; else PINCUR[c.id]=Math.min(cur, pins.length-1); } renderConversation(); toast('Откреплено'); return; }
+  if (t.closest('[data-pincycle]')){ const c=findChat(S.chatId); const pins=PINS[c.id]||[]; if(!pins.length) return; const cur=(((PINCUR[c.id]??(pins.length-1))%pins.length)+pins.length)%pins.length; flashMsg(threadOf(c)[pins[cur]].id); const next=(cur-1+pins.length)%pins.length; PINCUR[c.id]=next; const bar=t.closest('.chat-pinned'); if(bar){ const nm=threadOf(c)[pins[next]]; const lbl=bar.querySelector('.chat-pinned__lbl'); const tx=bar.querySelector('.chat-pinned__tx'); if(lbl)lbl.textContent='Закреплённое'+(pins.length>1?` · ${next+1}/${pins.length}`:''); if(tx)tx.textContent=(nm.text||nm.poll?.q||'вложение'); } return; }
   if (S.selMode){
     const bb=t.closest('[data-bulk]'); if(bb){ onBulk(bb.dataset.bulk); return; }
     const ms=t.closest('.msg'); if(ms){ const id=ms.dataset.mid; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); ms.classList.toggle('is-selected'); const bn=$('#bulkN'); if(bn)bn.textContent=S.sel.size+' выбрано'; if(S.sel.size===0)exitSel(); return; }
