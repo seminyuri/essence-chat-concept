@@ -61,6 +61,10 @@ const CHATS = {
       last:{by:'yuia', txt:'Готова помочь — спроси что угодно', t:'вчера'}, unread:0 },
     { id:'saved', type:'saved',   title:'Избранное', av:'saved', s:'', icon:'bookmark',
       last:{by:'me', txt:'Пароли от стенда', t:'пн'}, unread:0 },
+    { id:'arch_book', type:'group', title:'Книжный клуб «Суть»', av:'c', s:'КК', archived:true, members:['me','vera','alena'],
+      last:{by:'vera', txt:'Перенесли встречу на март', t:'12 фев'}, unread:0 },
+    { id:'arch_promo', type:'channel', title:'Промо · 2025', av:'d', s:'📢', icon:'hash', archived:true, muted:true,
+      last:{by:'sys', txt:'Итоги года — спасибо всем!', t:'дек'}, unread:2, subscribers:1240 },
   ],
   sushi: [
     { id:'upr',   type:'group',   title:'Суши Мама · Управление', av:'a', s:'СМ', folder:'upr', members:['me','dmitry','sveta','anya'],
@@ -197,6 +201,7 @@ const S = {
   editId: null,
   read: {},   // chatId -> true once opened (clears unread)
   selMode: false, sel: new Set(), csearch: null,
+  archiveView: false,
 };
 const PINS = { team: 3 };  // chatId -> pinned message index
 
@@ -248,7 +253,12 @@ function chatAvatar(c){
   return `<span class="chat-avatar chat-avatar--${c.av}">${esc(c.s)}${pr}</span>`;
 }
 function renderList(){
+  const inArchive = S.archiveView;
+  const archived = chatsFor(S.org).filter(c=>c.archived);
+  if (inArchive && !archived.length) { S.archiveView = false; return renderList(); }
   const list = chatsFor(S.org).filter(c=>{
+    if (inArchive) return c.archived;
+    if (c.archived) return false;
     if (S.folder==='unread') return !S.read[c.id] && c.unread>0;
     if (S.folder!=='all') return c.folder===S.folder;
     return true;
@@ -289,9 +299,23 @@ function renderList(){
     </div>`;
   };
   let html = '';
+  if (inArchive) {
+    const unreadArch = archived.reduce((n,c)=>n+(S.read[c.id]?0:(c.unread||0)),0);
+    html += `<button class="chat-archive-head" data-archback>${ic('back','icon--sm')} Архив${unreadArch?` · ${unreadArch}`:''}</button>`;
+  } else if (archived.length && !S.search && S.folder==='all') {
+    const unreadArch = archived.reduce((n,c)=>n+(S.read[c.id]?0:(c.unread||0)),0);
+    const names = archived.map(c=>c.title.replace(/[«»]/g,'').split(/[ ·]/)[0]).slice(0,3).join(', ');
+    html += `<button class="chat-row chat-row--archive" data-archopen>
+      <span class="chat-avatar chat-avatar--archive">${ic('archive')}</span>
+      <div class="chat-row__body">
+        <div class="chat-row__top"><span class="chat-row__name">Архив</span><span class="chat-row__time">${archived.length}</span></div>
+        <div class="chat-row__bot"><span class="chat-row__snip">${esc(names)}</span>
+          <div class="chat-row__meta">${unreadArch?`<span class="chat-unread-dot chat-unread-dot--muted">${unreadArch}</span>`:''}</div></div>
+      </div></button>`;
+  }
   if (pinned.length) html += `<div class="chat-list__sec">Закреплённые</div>` + pinned.map(row).join('');
   if (rest.length) html += (pinned.length?`<div class="chat-list__sec">Чаты</div>`:'') + rest.map(row).join('');
-  if (!list.length) html = `<div class="empty-state" style="padding:48px 20px"><div class="empty-state__title">Ничего не найдено</div><div class="empty-state__description">Попробуй другой запрос или папку.</div></div>`;
+  if (!list.length) html += `<div class="empty-state" style="padding:48px 20px"><div class="empty-state__title">${inArchive?'Архив пуст':'Ничего не найдено'}</div><div class="empty-state__description">${inArchive?'Архивированные чаты появятся здесь.':'Попробуй другой запрос или папку.'}</div></div>`;
   $('#chatList').innerHTML = html;
 }
 
@@ -873,11 +897,11 @@ function openChat(id){
   syncURL();
 }
 function switchOrg(id){
-  S.org=id; S.chatId=null; S.folder='all'; localStorage.setItem('sut-chat:org',id);
+  S.org=id; S.chatId=null; S.folder='all'; S.archiveView=false; localStorage.setItem('sut-chat:org',id);
   $('#orgSwitch')?.classList.remove('is-open'); $('#orgMenu')?.classList.add('hidden');
   renderAll(); syncURL();
 }
-function setFolder(id){ S.folder=id; renderFolders(); renderList(); }
+function setFolder(id){ S.folder=id; S.archiveView=false; renderFolders(); renderList(); }
 function setReply(m){ const who = m.from==='me'?'Вы':(U[m.from]||{name:m.from}).name; S.reply={who,txt:m.text||'вложение', mid:m.id}; renderConversation(); $('#cmpInput')?.focus(); }
 function clearReply(){ S.reply=null; renderConversation(); }
 function send(){
@@ -938,6 +962,8 @@ document.addEventListener('click', e=>{
   // folders
   const f=t.closest('[data-folder]'); if(f){ setFolder(f.dataset.folder); return; }
   // open chat row
+  if(t.closest('[data-archopen]')){ S.archiveView=true; renderList(); return; }
+  if(t.closest('[data-archback]')){ S.archiveView=false; renderList(); return; }
   const row=t.closest('[data-chat]'); if(row && row.closest('#chatList')){ openChat(row.dataset.chat); return; }
   // theme
   if (t.closest('#themeToggle')){ toggleTheme(); return; }

@@ -196,6 +196,18 @@ html, body { height: 100%; overflow: hidden; }
 .chat-row__orgtag { flex: none; font-family: var(--type-mono); font-size: 9px; font-weight: 600; color: var(--color-fg-subtle);
                     background: var(--color-bg-muted); padding: 1px 6px; border-radius: var(--radius-full); white-space: nowrap; }
 
+/* archive */
+.chat-avatar--archive { background: var(--color-bg-muted); color: var(--color-fg-muted); }
+.chat-avatar--archive .icon { width: 24px; height: 24px; }
+.chat-row--archive { width: 100%; text-align: left; background: none; border: 0; font: inherit; }
+.chat-unread-dot--muted { background: var(--color-fg-subtle); }
+.chat-archive-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 14px; margin-bottom: 2px;
+                     background: none; border: 0; border-bottom: 0.5px solid var(--color-border); cursor: pointer;
+                     font-family: var(--type-sans); font-size: 14px; font-weight: 600; color: var(--color-fg);
+                     transition: color var(--motion-fast); }
+.chat-archive-head:hover { color: var(--color-accent); }
+.chat-archive-head .icon { color: var(--color-fg-muted); }
+
 /* ════════════════════════════ CONVERSATION ════════════════════════════ */
 .chat-cvhead { position: relative; z-index: 2; flex: none; height: 60px; display: flex; align-items: center; gap: 12px;
                padding: 0 12px 0 14px; background: var(--bg-glass); backdrop-filter: blur(14px) saturate(140%);
