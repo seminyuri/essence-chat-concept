@@ -456,6 +456,7 @@ function renderInfo(){
   }
   // members for group
   if (c.type==='group'){
+    body += `<div class="info__sec" style="padding:8px 16px"><button class="info__member" style="width:100%;padding:6px 0" data-groupadmin><span class="info__addmembers-ic">${ic('shield','icon--sm')}</span><div class="info__member-b"><div class="info__member-nm">Права и управление</div><div class="info__member-pr">роли · кто что может · медленный режим</div></div>${ic('chev-r','icon--sm')}</button></div>`;
     body += `<div class="info__addmembers"><span class="info__addmembers-ic">${ic('user-plus','icon--sm')}</span>Добавить участников</div>`;
     const roles = { me:'owner', anya:'admin', dmitry:'admin' };
     body += (c.members||[]).map(id=>{
@@ -705,6 +706,84 @@ function avatarCropModal(){
   const z=$('#cropzoom'); if(z) z.addEventListener('input',()=>{ const av=$('#cropav'); if(av) av.style.fontSize=(40*+z.value)+'px'; });
 }
 
+/* call overlay — audio / video, 1:1 & group */
+let callTimer;
+function callOverlay(chatId, kind){
+  const c = findChat(chatId); if(!c) return;
+  const u = userOf(c);
+  const isVideo = kind==='video';
+  const isGroup = c.type==='group';
+  const av = (uu) => `<span class="call__ava chat-avatar--${uu?uu.av:c.av}">${esc(uu?uu.s:c.s)}</span>`;
+  let stage, extraTimer='';
+  if (isVideo){
+    if (isGroup){
+      const mem = (c.members||['me']).slice(0,4);
+      const cols = mem.length<=2?mem.length:2;
+      stage = `<div class="call__grid" style="grid-template-columns:repeat(${cols},1fr)">${mem.map(id=>`<div class="call__tile">${av(U[id])}<span class="call__tile-nm">${esc((U[id]||{name:'Вы'}).name.split(' ')[0])}${id==='me'?' (вы)':''}</span></div>`).join('')}</div>`;
+    } else {
+      stage = `<div class="call__remote">${av(u)}</div><div class="call__self">${av(U.me)}</div>`;
+    }
+    extraTimer = `<div class="call__center" style="justify-content:flex-start;padding-top:24px"><div class="call__st" id="callTimer" style="background:rgba(12,10,7,.42);padding:5px 12px;border-radius:999px">Соединение…</div></div>`;
+  } else {
+    stage = `<div class="call__center">${av(u||c)}<div class="call__nm">${esc(c.title)}</div><div class="call__st" id="callTimer">Соединение…</div></div>`;
+  }
+  const wrap = document.createElement('div'); wrap.className='call';
+  wrap.innerHTML = `
+    <div class="call__top"><div class="call__top-t"><div class="call__top-nm">${esc(c.title)}</div><div class="call__top-st">${isVideo?'Видеозвонок':'Аудиозвонок'}${isGroup?' · группа':''}</div></div>
+      <button class="call__mini" data-cend title="Свернуть">${ic('maximize','icon--sm')}</button></div>
+    <div class="call__stage">${stage}</div>${extraTimer}
+    <div class="call__ctrls">
+      <button class="call__btn" data-cmute title="Микрофон">${ic('mic')}</button>
+      <button class="call__btn" data-cspk title="Динамик">${ic('volume')}</button>
+      <button class="call__btn${isVideo?'':' is-off'}" data-cvid title="Камера">${ic(isVideo?'video':'video-off')}</button>
+      <button class="call__btn call__btn--end" data-cend title="Завершить"><svg class="icon" style="transform:rotate(135deg)"><use href="#i-phone"/></svg></button>
+    </div>`;
+  document.body.appendChild(wrap);
+  let secs=0; clearInterval(callTimer);
+  setTimeout(()=>{ const t=$('#callTimer'); if(t)t.textContent='00:00'; callTimer=setInterval(()=>{ secs++; const t2=$('#callTimer'); if(t2)t2.textContent=`${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`; },1000); }, 900);
+  wrap.addEventListener('click', e=>{
+    if(e.target.closest('[data-cend]')){ clearInterval(callTimer); wrap.remove(); return; }
+    const mu=e.target.closest('[data-cmute]'); if(mu){ mu.classList.toggle('is-off'); mu.querySelector('use').setAttribute('href', mu.classList.contains('is-off')?'#i-mic-off':'#i-mic'); return; }
+    const vd=e.target.closest('[data-cvid]'); if(vd){ vd.classList.toggle('is-off'); vd.querySelector('use').setAttribute('href', vd.classList.contains('is-off')?'#i-video-off':'#i-video'); return; }
+    const sp=e.target.closest('[data-cspk]'); if(sp){ sp.classList.toggle('is-off'); return; }
+  });
+}
+
+/* notifications dropdown */
+function notifDropdown(x,y){
+  const items = [
+    {ic:'message', tone:'accent', t:'<b>Мария Кольцова</b>: голосовое сообщение', tm:'2 мин', unread:true},
+    {ic:'at', tone:'accent', t:'<b>Вера</b> упомянула вас в «Суть · Команда»', tm:'12 мин', unread:true},
+    {ic:'smile', tone:'warning', t:'<b>Марк</b> отреагировал 🔥 на ваше сообщение', tm:'18 мин'},
+    {ic:'user-plus', tone:'success', t:'<b>Дмитрий</b> добавил вас в «Филиал Центр · смена»', tm:'1 ч'},
+    {ic:'message', tone:'muted', t:'<b>Аня</b>: новое сообщение', tm:'2 ч'},
+  ];
+  const html = `<div class="shell-bell__menu is-open" style="position:static;width:360px">
+    <div class="shell-bell__head"><div class="shell-bell__heading">Уведомления</div><button class="shell-bell__markall" title="Прочитать все">${ic('checks','icon--sm')}</button></div>
+    <div class="shell-bell__list">${items.map(n=>`<div class="shell-bell__row${n.unread?' is-unread':''}">${n.unread?'<span class="shell-bell__row-flag"></span>':''}<div class="shell-bell__row-main"><span class="shell-bell__icon shell-bell__icon--${n.tone}">${ic(n.ic,'icon--sm')}</span><div class="shell-bell__row-body"><div class="shell-bell__row-title">${n.t}</div><div class="shell-bell__row-time">${n.tm}</div></div></div></div>`).join('')}</div>
+    <a class="shell-bell__foot">Показать все ${ic('chev-r','icon--sm')}</a></div>`;
+  popover(html, x-360, y);
+}
+
+/* group admin & permissions */
+function groupAdminModal(chatId){
+  const c=findChat(chatId); if(!c) return;
+  modal(`<div class="modal__header"><div class="modal__title">Управление · ${esc(c.title)}</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body" style="max-height:66vh">
+      <div class="set__grouph">Тип группы</div>
+      <div class="segmented" style="width:100%;margin-bottom:20px"><label class="segmented__option segmented__option--active" style="flex:1;justify-content:center">Приватная</label><label class="segmented__option" style="flex:1;justify-content:center">Публичная</label></div>
+      <div class="set__grouph">Участники могут</div>
+      <div class="set__card" style="margin-bottom:20px">
+        ${toggleRow('Отправлять сообщения','',true)}${toggleRow('Отправлять медиа и файлы','',true)}${toggleRow('Добавлять участников','',false)}${toggleRow('Закреплять сообщения','',false)}${toggleRow('Менять название и фото','',false)}
+      </div>
+      <div class="set__grouph">Медленный режим</div>
+      <div class="set__card" style="margin-bottom:20px"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Задержка между сообщениями</div><div class="set__item-d">Ограничивает флуд в активных группах</div></div>${seg('slow',[['off','Выкл'],['30','30с'],['60','1м'],['300','5м']],'off')}</div></div>
+      <div class="set__grouph">Роли</div>
+      <div class="set__card">${(c.members||[]).map(id=>{const mu=U[id]||{name:id,av:'c',s:'?'};const role=id==='me'?'owner':(id==='anya'||id==='dmitry')?'admin':'member';return `<div class="info__member" style="padding:10px 14px">${AVATAR(mu)}<div class="info__member-b"><div class="info__member-nm">${esc(mu.name)}${id==='me'?' (вы)':''}</div><div class="info__member-pr">${role==='owner'?'Все права':role==='admin'?'Администратор':'Участник'}</div></div>${role==='owner'?'<span class="info__role info__role--owner">владелец</span>':role==='admin'?'<span class="info__role info__role--admin">админ</span>':'<button class="btn btn--ghost btn--sm" data-promote>Сделать админом</button>'}</div>`;}).join('')}</div>
+    </div>`,'md');
+  OV.addEventListener('click',e=>{ if(e.target.closest('[data-promote]')) toast('Назначен администратором'); });
+}
+
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
 function openChat(id){
   S.chatId = id; S.reply=null; S.editId=null;
@@ -762,6 +841,7 @@ document.addEventListener('click', e=>{
   // settings entry
   if (t.closest('#meAvatar')){ renderSettings('profile'); return; }
   { const railI=t.closest('.shell-apprail__item'); if (railI && railI.title==='Настройки'){ renderSettings('appearance'); return; } }
+  if (t.closest('#bellBtn')){ const r=t.closest('#bellBtn').getBoundingClientRect(); notifDropdown(r.right, r.bottom+8); return; }
   // global search / cmdk
   if (t.closest('#globalSearch')){ cmdk(); return; }
   // new chat
@@ -771,7 +851,7 @@ document.addEventListener('click', e=>{
   if (t.closest('[data-closeinfo]')){ toggleInfo(false); if(innerWidth<=900)$('#chatBody').setAttribute('data-mobile','chat'); return; }
   if (t.closest('[data-mobile-back]')){ $('#chatBody').setAttribute('data-mobile','list'); return; }
   if (t.closest('[data-chatmenu]')){ const r=t.closest('[data-chatmenu]').getBoundingClientRect(); chatHeaderMenu(r.right-200,r.bottom+6); return; }
-  if (t.closest('[data-call]')){ toast(t.closest('[data-call]').dataset.call==='video'?'Видеозвонок — демо':'Аудиозвонок — демо'); return; }
+  if (t.closest('[data-call]')){ callOverlay(S.chatId, t.closest('[data-call]').dataset.call); return; }
   if (t.closest('[data-chatsearch]')){ S.csearch=''; renderConversation(); return; }
   if (t.closest('[data-csclose]')){ S.csearch=null; renderConversation(); return; }
   { const cn=t.closest('[data-csnav]'); if(cn){ csNav(+cn.dataset.csnav); return; } }
@@ -784,6 +864,7 @@ document.addEventListener('click', e=>{
   { const vt=t.closest('[data-vote]'); if(vt){ const ms=t.closest('.msg'); if(ms)votePoll(ms.dataset.mid,+vt.dataset.vote); return; } }
   // info tabs
   const it=t.closest('[data-infotab]'); if(it){ S.infoTab=it.dataset.infotab; renderInfo(); return; }
+  if (t.closest('[data-groupadmin]')){ groupAdminModal(S.chatId); return; }
   // ribbon actions
   if (t.closest('[data-invite]')){ inviteModal(); return; }
   if (t.closest('[data-natal]')){ toggleInfo(true); return; }
@@ -1007,5 +1088,6 @@ function boot(){
   renderAll();
   if (S.chatId && findChat(S.chatId)) openChat(S.chatId);
   else if (innerWidth>900){ /* auto-open first chat on desktop for a full first impression */ openChat(chatsFor(S.org)[0].id); }
+  if (P.get('call') && findChat(S.chatId)) callOverlay(S.chatId, P.get('call'));
 }
 boot();
