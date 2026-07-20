@@ -545,8 +545,10 @@ function renderInfo(){
 }
 
 /* ─────────────────────────── OVERLAYS ─────────────────────────── */
-const OV = $('#overlays');
-function closeOverlays(){ OV.innerHTML=''; }
+let OV = $('#overlays');
+// Replace #overlays with a fresh clone so ALL per-overlay click/change listeners
+// are dropped (innerHTML='' alone leaks them → stale closures double-fire on reopen).
+function closeOverlays(){ if(OV.firstChild){ const f=OV.cloneNode(false); OV.replaceWith(f); OV=f; } }
 function lightbox(photo){
   const w = document.createElement('div'); w.className='lightbox';
   w.innerHTML = `<button class="lightbox__close" data-lbclose>${ic('x')}</button><div class="lightbox__img" style="width:min(880px,92vw);aspect-ratio:4/3;background:${photoBg(photo)}"></div>`;
@@ -652,6 +654,7 @@ function cmdk(){
       </div>
       <div id="ckList" style="overflow:auto;padding:6px"></div>
     </div></div>`;
+  closeOverlays();
   OV.innerHTML = html;
   const orgOf = cid => { for(const o in CHATS) if(CHATS[o].find(x=>x.id===cid)) return o; return 'sut'; };
   const ckChat = (c,o) => `<button class="menu__item" data-ck="${c.id}" data-ck-org="${o}"><span class="chat-avatar chat-avatar--${c.av}" style="width:32px;height:32px;font-size:12px">${c.av==='saved'?ic('bookmark','icon--sm'):esc(c.s)}</span><span style="flex:1;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.title)}</span><span style="font-size:10px;color:var(--color-fg-subtle);font-family:var(--type-mono)">${esc(ORGS[o].name)}</span></button>`;
@@ -1024,14 +1027,35 @@ document.addEventListener('click', e=>{
   // read-by
   const rc=t.closest('[data-readby]'); if(rc){ const r=rc.getBoundingClientRect(); readByPopover(JSON.parse(rc.dataset.readby), r.left, r.bottom); return; }
 });
+// context menu on a chat-list row (Telegram: pin / mute / archive / read / delete)
+function chatRowMenu(id, x, y){
+  const c=findChat(id); if(!c) return;
+  const isRead = S.read[id] || !(c.unread>0);
+  const acts = [
+    {ic:'pin',     label:c.pinned?'Открепить':'Закрепить',                       run(){ c.pinned=!c.pinned; return c.pinned?'Закреплено вверху':'Откреплено'; }},
+    {ic:'mute',    label:c.muted?'Включить уведомления':'Отключить уведомления', run(){ c.muted=!c.muted; return c.muted?'Уведомления отключены':'Уведомления включены'; }},
+    {ic:'archive', label:c.archived?'Вернуть из архива':'В архив',              run(){ c.archived=!c.archived; if(c.archived&&S.chatId===id)S.chatId=null; return c.archived?'Убрано в архив':'Возвращено из архива'; }},
+    {ic:'check',   label:isRead?'Пометить непрочитанным':'Пометить прочитанным', run(){ if(isRead){ S.read[id]=false; if(!(c.unread>0))c.unread=1; } else { S.read[id]=true; } return isRead?'Отмечено непрочитанным':'Отмечено прочитанным'; }},
+  ];
+  popover(`<div class="menu" style="min-width:232px">${acts.map((a,i)=>`<button class="menu__item" data-rowact="${i}">${ic(a.ic,'icon--sm')} ${a.label}</button>`).join('')}<div class="menu__sep"></div><button class="menu__item menu__item--danger" data-rowact="del">${ic('trash','icon--sm')} Удалить чат</button></div>`, x, y);
+  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-rowact]'); if(!b) return; const v=b.dataset.rowact;
+    if(v==='del'){ closeOverlays(); toast('Чат удалён — в полной версии'); return; }
+    const msg=acts[+v].run(); const wasOpen=S.chatId===id; closeOverlays(); renderList(); if(wasOpen&&!c.archived) renderConversation(); toast(msg);
+  });
+}
 // context menu on right-click of a message
 document.addEventListener('contextmenu', e=>{
+  const lr=e.target.closest('#chatList [data-chat]'); if(lr){ e.preventDefault(); chatRowMenu(lr.dataset.chat, Math.min(e.clientX, innerWidth-244), e.clientY); return; }
   if (e.target.closest('#cmpSend')){ e.preventDefault(); const r=e.target.closest('#cmpSend').getBoundingClientRect(); popover(`<div class="menu" style="min-width:214px"><button class="menu__item" data-sendopt="silent">${ic('mute','icon--sm')} Отправить без звука</button><button class="menu__item" data-sendopt="schedule">${ic('clock','icon--sm')} Отправить позже</button></div>`, r.right-214, r.top-96); return; }
   const m=e.target.closest('.msg'); if(m){ e.preventDefault(); contextMenu(m.dataset.mid, e.clientX, e.clientY); }
 });
 // mobile: long-press a message opens the reaction row + actions
 let lpTimer;
-document.addEventListener('touchstart', e=>{ const m=e.target.closest('.msg'); if(m && !S.selMode && !e.target.closest('button,a,.msg__poll-opt')){ lpTimer=setTimeout(()=>{ const r=m.querySelector('.msg__bubble').getBoundingClientRect(); contextMenu(m.dataset.mid, Math.min(r.left+20, innerWidth-230), r.top); }, 450); } }, {passive:true});
+document.addEventListener('touchstart', e=>{
+  const lr=e.target.closest('#chatList [data-chat]');
+  if(lr){ lpTimer=setTimeout(()=>{ const r=lr.getBoundingClientRect(); chatRowMenu(lr.dataset.chat, Math.min(r.left+30, innerWidth-244), Math.min(r.top+20, innerHeight-260)); }, 450); return; }
+  const m=e.target.closest('.msg'); if(m && !S.selMode && !e.target.closest('button,a,.msg__poll-opt')){ lpTimer=setTimeout(()=>{ const r=m.querySelector('.msg__bubble').getBoundingClientRect(); contextMenu(m.dataset.mid, Math.min(r.left+20, innerWidth-230), r.top); }, 450); }
+}, {passive:true});
 document.addEventListener('touchend', ()=>clearTimeout(lpTimer));
 document.addEventListener('touchmove', ()=>clearTimeout(lpTimer), {passive:true});
 // double-click / double-tap to react ❤️
