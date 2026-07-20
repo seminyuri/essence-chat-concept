@@ -961,7 +961,7 @@ function natalChartModal(u){
 
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
 function openChat(id){
-  S.chatId = id; S.reply=null; S.editId=null;
+  S.chatId = id; S.reply=null; S.editId=null; S.selMode=false; S.sel.clear(); S.csearch=null;
   const c = findChat(id);
   if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.read[id]=true; c.unread=0; }
   renderList(); renderFolders(); renderWorkspace(); renderConversation(); renderInfo();
@@ -969,7 +969,9 @@ function openChat(id){
   syncURL();
 }
 function switchOrg(id){
-  S.org=id; S.chatId=null; S.folder='all'; S.archiveView=false; localStorage.setItem('sut-chat:org',id);
+  S.org=id; S.chatId=null; S.folder='all'; S.archiveView=false;
+  S.selMode=false; S.sel.clear(); S.reply=null; S.editId=null; S.csearch=null;
+  localStorage.setItem('sut-chat:org',id);
   $('#orgSwitch')?.classList.remove('is-open'); $('#orgMenu')?.classList.add('hidden');
   renderAll(); syncURL();
 }
