@@ -359,6 +359,8 @@ html, body { height: 100%; overflow: hidden; }
              background: var(--color-accent); color: var(--color-accent-on); cursor: pointer; box-shadow: var(--shadow-soft);
              transition: background var(--motion-duration-fast) var(--motion-ease), transform var(--motion-duration-fast) var(--ease-pop); }
 .cmp__send:hover { background: var(--color-accent-strong); }
+.cmp__bar:not(.has-text) .cmp__send { display: none; }    /* отправка — только когда есть текст */
+.cmp__bar.has-text [data-voice] { display: none; }        /* иначе — микрофон */
 .cmp__send:active { transform: scale(.9); }
 .cmp__send .icon { width: 20px; height: 20px; }
 .cmp__hint { display: flex; justify-content: space-between; align-items: center; padding: 5px 12px 0; font-size: 11px; color: var(--color-fg-subtle); }

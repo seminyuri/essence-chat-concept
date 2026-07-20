@@ -573,7 +573,7 @@ function onContext(cmd, mid){
   if (cmd==='reply') setReply(m);
   else if (cmd==='react') { const r=$(`.msg[data-mid="${mid}"] .msg__bubble`).getBoundingClientRect(); reactBar(mid, r.left+r.width/2, r.top); }
   else if (cmd==='copy') { navigator.clipboard?.writeText(m.text||''); toast('Скопировано'); }
-  else if (cmd==='edit') { S.editId=mid; S.reply=null; renderConversation(); const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);} }
+  else if (cmd==='edit') { S.editId=mid; S.reply=null; renderConversation(); const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); inp.closest('.cmp__bar')?.classList.add('has-text');} }
   else if (cmd==='delete'){ const th=MSGS[c.id]=threadOf(c).slice(); const i=th.findIndex(x=>x.id===mid); if(i>-1)th.splice(i,1); renderConversation(); toast('Сообщение удалено'); }
   else if (cmd==='pin'){ PINS[S.chatId]=threadOf(c).findIndex(x=>x.id===mid); renderConversation(); toast('Закреплено'); }
   else if (cmd==='forward') forwardPicker(mid);
@@ -595,7 +595,7 @@ function emojiPicker(target, x, y){
   $$('.ep-e',w).forEach(b=>{b.onmouseenter=()=>b.style.background='var(--color-bg-muted)';b.onmouseleave=()=>b.style.background='';});
   w.addEventListener('click', e=>{ const b=e.target.closest('.ep-e'); if(!b)return;
     if (target && target.react){ toggleReact(target.react, b.dataset.e); closeOverlays(); }
-    else { const inp=$('#cmpInput'); if(inp){inp.value+=b.dataset.e; inp.focus();} }
+    else { const inp=$('#cmpInput'); if(inp){inp.value+=b.dataset.e; inp.focus(); inp.closest('.cmp__bar')?.classList.add('has-text');} }
   });
 }
 function forwardPicker(mid){
@@ -822,7 +822,7 @@ function notifDropdown(x,y){
   const html = `<div class="shell-bell__menu is-open" style="position:static;width:360px">
     <div class="shell-bell__head"><div class="shell-bell__heading">Уведомления</div><button class="shell-bell__markall" title="Прочитать все">${ic('checks','icon--sm')}</button></div>
     <div class="shell-bell__list">${items.map(n=>`<div class="shell-bell__row${n.unread?' is-unread':''}">${n.unread?'<span class="shell-bell__row-flag"></span>':''}<div class="shell-bell__row-main"><span class="shell-bell__icon shell-bell__icon--${n.tone}">${ic(n.ic,'icon--sm')}</span><div class="shell-bell__row-body"><div class="shell-bell__row-title">${n.t}</div><div class="shell-bell__row-time">${n.tm}</div></div></div></div>`).join('')}</div>
-    <a class="shell-bell__foot">Показать все ${ic('chev-r','icon--sm')}</a></div>`;
+    <a class="shell-bell__foot" data-hint="Все уведомления — в полной версии">Показать все ${ic('chev-r','icon--sm')}</a></div>`;
   popover(html, x-360, y);
 }
 
@@ -1018,7 +1018,7 @@ document.addEventListener('keydown', e=>{
   }
 });
 document.addEventListener('input', e=>{
-  if(e.target.id==='cmpInput'){ e.target.style.height='auto'; e.target.style.height=Math.min(168,e.target.scrollHeight)+'px'; }
+  if(e.target.id==='cmpInput'){ e.target.style.height='auto'; e.target.style.height=Math.min(168,e.target.scrollHeight)+'px'; const bar=e.target.closest('.cmp__bar'); if(bar) bar.classList.toggle('has-text', !!e.target.value.trim()); }
   if(e.target.id==='csIn'){ S.csearch=e.target.value; const c=findChat(S.chatId); const sc=$('#scroll'); if(sc)sc.innerHTML=renderMessages(c); updateCSCount(); }
 });
 
