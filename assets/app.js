@@ -389,7 +389,8 @@ function renderMessages(c){
     let meta = `<span class="msg__meta">${m.edited?'<span class="msg__edited">изм. · </span>':''}${esc(m.t)}`;
     if (c.type==='channel' && m.views) meta += ` <span class="msg__readcount">${ic('eye','icon--xs')}${m.views}</span>`;
     else if (out){
-      if (m.readBy && c.type==='group') meta += ` <span class="msg__readcount" data-readby='${esc(JSON.stringify(m.readBy))}'>${ic('eye','icon--xs')}${m.readBy.length}</span>`;
+      if (m.sending) meta += ` <span class="chat-tick" style="color:var(--color-fg-subtle)">${ic('clock','icon--xs')}</span>`;
+      else if (m.readBy && c.type==='group') meta += ` <span class="msg__readcount" data-readby='${esc(JSON.stringify(m.readBy))}'>${ic('eye','icon--xs')}${m.readBy.length}</span>`;
       else meta += ` <span class="chat-tick">${ic(m.read?'checks':'check')}</span>`;
     }
     meta += `</span>`;
@@ -451,8 +452,9 @@ function onBulk(cmd){
 function renderComposer(c){
   if (c.type==='channel') return `<div class="cmp"><div class="cmp__broadcast">${ic('bell','icon--sm')} Канал · только владелец публикует · <button class="btn btn--link" style="height:auto">${c.muted?'Включить уведомления':'Отключить уведомления'}</button></div></div>`;
   const reply = S.reply ? `<div class="cmp__reply">${ic('reply','cmp__reply-ic')}<div class="cmp__reply-b"><div class="cmp__reply-who">Ответ · ${esc(S.reply.who)}</div><div class="cmp__reply-tx">${esc(S.reply.txt)}</div></div><button class="shell-icon-btn cmp__reply-x" data-clear-reply>${ic('x','icon--sm')}</button></div>` : '';
+  const editBar = (S.editId && !S.reply) ? `<div class="cmp__reply">${ic('pen','cmp__reply-ic')}<div class="cmp__reply-b"><div class="cmp__reply-who">Редактирование</div><div class="cmp__reply-tx">${esc((threadOf(c).find(x=>x.id===S.editId)||{}).text||'')}</div></div><button class="shell-icon-btn cmp__reply-x" data-clear-edit>${ic('x','icon--sm')}</button></div>` : '';
   return `<div class="cmp">
-    ${reply}
+    ${reply}${editBar}
     <div class="cmp__bar">
       <button class="cmp__iconbtn" data-attach title="Прикрепить">${ic('clip','icon--sm')}</button>
       <textarea class="cmp__input" id="cmpInput" rows="1" placeholder="Сообщение…"></textarea>
@@ -539,13 +541,8 @@ function popover(html, x, y, cls=''){
 }
 const EMOJI = ['❤️','👍','🔥','😂','😮','😢','🙏','🎉','👏','✅','🤝','💯','😍','🤔','🥳','💛','☀️','✨'];
 function reactBar(mid, x, y){
-  popover(`<div style="display:flex;gap:2px;padding:5px;background:var(--color-bg-elevated);border:var(--hairline-width) solid var(--color-border-strong);border-radius:var(--radius-full);box-shadow:var(--shadow-pop)">
-    ${EMOJI.slice(0,7).map(e=>`<button class="rb-e" data-e="${e}" style="width:36px;height:36px;border-radius:50%;font-size:19px;transition:transform .1s">${e}</button>`).join('')}
-    <button class="rb-e" data-more style="width:36px;height:36px;border-radius:50%;color:var(--color-fg-muted)">${ic('plus','icon--sm')}</button>
-  </div>`, x-150, y-52);
-  $$('.rb-e').forEach(b=>b.onmouseenter=()=>b.style.transform='scale(1.25)');
-  $$('.rb-e').forEach(b=>b.onmouseleave=()=>b.style.transform='');
-  OV.addEventListener('click', e=>{ const b=e.target.closest('.rb-e'); if(!b)return; if(b.dataset.more){emojiPicker({react:mid},x,y);return;} toggleReact(mid,b.dataset.e); closeOverlays(); });
+  popover(`<div class="ctx-react">${EMOJI.slice(0,7).map(e=>`<button class="ctx-react__e" data-e="${e}">${e}</button>`).join('')}<button class="ctx-react__e ctx-react__more" data-more>${ic('plus','icon--sm')}</button></div>`, x-150, y-52);
+  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-e]'); if(b){ toggleReact(mid,b.dataset.e); closeOverlays(); return; } if(e.target.closest('[data-more]')){ emojiPicker({react:mid},x,y); } });
 }
 function contextMenu(mid, x, y){
   const c = findChat(S.chatId); const m = threadOf(c).find(x=>x.id===mid);
@@ -573,7 +570,7 @@ function onContext(cmd, mid){
   if (cmd==='reply') setReply(m);
   else if (cmd==='react') { const r=$(`.msg[data-mid="${mid}"] .msg__bubble`).getBoundingClientRect(); reactBar(mid, r.left+r.width/2, r.top); }
   else if (cmd==='copy') { navigator.clipboard?.writeText(m.text||''); toast('Скопировано'); }
-  else if (cmd==='edit') { S.editId=mid; const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus();} toast('Редактирование сообщения'); }
+  else if (cmd==='edit') { S.editId=mid; S.reply=null; renderConversation(); const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);} }
   else if (cmd==='delete'){ const th=MSGS[c.id]=threadOf(c).slice(); const i=th.findIndex(x=>x.id===mid); if(i>-1)th.splice(i,1); renderConversation(); toast('Сообщение удалено'); }
   else if (cmd==='pin'){ PINS[S.chatId]=threadOf(c).findIndex(x=>x.id===mid); renderConversation(); toast('Закреплено'); }
   else if (cmd==='forward') forwardPicker(mid);
@@ -864,14 +861,15 @@ function clearReply(){ S.reply=null; renderConversation(); }
 function send(){
   const inp=$('#cmpInput'); if(!inp)return; const v=inp.value.trim(); if(!v)return;
   const c=findChat(S.chatId); const th = MSGS[c.id] = threadOf(c).slice();
-  if (S.editId){ const m=th.find(x=>x.id===S.editId); if(m){m.text=v;m.edited=true;} S.editId=null; }
-  else th.push({ id:'m'+uid(), from:'me', t:nowT(), text:v, read:false, replyTo:S.reply?{who:S.reply.who,txt:S.reply.txt}:null });
+  if (S.editId){ const m=th.find(x=>x.id===S.editId); if(m){m.text=v;m.edited=true;} S.editId=null; S.reply=null; renderConversation(); renderList(); return; }
+  const msg = { id:'m'+uid(), from:'me', t:nowT(), text:v, sending:true, read:false, replyTo:S.reply?{who:S.reply.who,txt:S.reply.txt}:null };
+  th.push(msg);
   c.last={by:'me',txt:v,t:nowT(),read:false}; S.reply=null;
   renderConversation(); renderList();
   { const _sc=$('#scroll'); if(_sc) _sc.lastElementChild?.classList.add('msg-in'); }
   // fake delivered→read + a reply for demo liveliness
-  const last = th[th.length-1];
-  setTimeout(()=>{ last.read=true; if(S.chatId===c.id) renderConversation(); }, 1400);
+  setTimeout(()=>{ msg.sending=false; if(S.chatId===c.id) renderConversation(); }, 550);
+  setTimeout(()=>{ msg.read=true; if(S.chatId===c.id) renderConversation(); }, 1700);
 }
 function nowT(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 function toggleReact(mid, e){
@@ -963,6 +961,7 @@ document.addEventListener('click', e=>{
   if (t.closest('#cmpSend')){ send(); return; }
   { const so=t.closest('[data-sendopt]'); if(so){ closeOverlays(); if($('#cmpInput')?.value.trim()) send(); toast(so.dataset.sendopt==='silent'?'Отправлено без звука':'Запланировано на завтра, 09:00'); return; } }
   if (t.closest('[data-clear-reply]')){ clearReply(); return; }
+  if (t.closest('[data-clear-edit]')){ S.editId=null; renderConversation(); return; }
   if (t.closest('[data-emoji]')){ emojiPicker(null); return; }
   if (t.closest('[data-attach]')){ const r=t.closest('[data-attach]').getBoundingClientRect(); attachMenu(r.left,r.top); return; }
   if (t.closest('[data-voice]')){ toast('Запись голосового (демо) — отпусти, чтобы отправить'); return; }
