@@ -1349,6 +1349,7 @@ function boot(){
   if (S.chatId && findChat(S.chatId)) openChat(S.chatId);
   else if (innerWidth>900 && chatsFor(S.org)[0]){ /* auto-open first chat on desktop for a full first impression */ openChat(chatsFor(S.org)[0].id); }
   else renderAll();
+  if (S.info && S.chatId && innerWidth<=900) $('#chatBody').setAttribute('data-mobile','info');  // ?panel=1 deep-link on mobile
   if (P.get('call') && findChat(S.chatId)) callOverlay(S.chatId, P.get('call'));
 }
 boot();
