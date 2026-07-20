@@ -567,6 +567,15 @@ html, body { height: 100%; overflow: hidden; }
                 transition: transform var(--motion-duration-fast) var(--ease-pop), background var(--motion-duration-fast) var(--motion-ease); }
 .ctx-react__e:hover { transform: scale(1.22); background: var(--color-bg-muted); }
 .ctx-react__more:hover { transform: scale(1.1); }
+/* emoji / sticker picker */
+.ep-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.ep-tab { flex: 1; padding: 6px 0; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600;
+          color: var(--color-fg-muted); background: none; border: 0; cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
+.ep-tab:hover { background: var(--color-bg-muted); }
+.ep-tab.is-active { background: var(--color-accent-soft); color: var(--color-accent); }
+.ep-st { aspect-ratio: 1; display: grid; place-items: center; font-size: 34px; border-radius: var(--radius-md);
+         background: none; border: 0; cursor: pointer; transition: transform var(--motion-fast), background var(--motion-fast); }
+.ep-st:hover { transform: scale(1.12); background: var(--color-bg-muted); }
 /* .menu is position:absolute by default (essence). Inside any popover (.ov-pop —
    context menu, chat «⋯», attach, send-options) it must stack in flow, else it
    drops out, the popover measures 0 height, mis-clamps and clips off-screen. */

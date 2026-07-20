@@ -624,18 +624,26 @@ function readByPopover(list, x, y){
   </div>`;
   popover(html, x-110, y+8);
 }
+const STICKERS = ['🙏','🔥','❤️','😂','🎉','👏','🤝','💯','🥳','😎','🤗','🫶','✨','🌙','🔮','☕','🍣','🐟','🚀','⭐','💎','📌','✅','👀','🌚','🥂','🧿','🕊️'];
 function emojiPicker(target, x, y){
   const all = [...EMOJI, '🙂','😉','😅','😭','😡','🤗','🫶','👀','🚀','⭐','🌙','🔮','☕','🍣','🐟','📦','💬','⏰','📎','🎁','💎'];
-  const html = `<div style="width:300px;background:var(--color-bg-elevated);border:var(--hairline-width) solid var(--color-border-strong);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:10px">
-    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px">${all.map(e=>`<button class="ep-e" data-e="${e}" style="height:34px;border-radius:8px;font-size:20px;transition:background .1s">${e}</button>`).join('')}</div>
-  </div>`;
+  const isReact = !!(target && target.react);
+  const tabs = isReact ? '' : `<div class="ep-tabs"><button class="ep-tab is-active" data-tab="emoji">Эмодзи</button><button class="ep-tab" data-tab="sticker">Стикеры</button></div>`;
+  const emojiGrid = `<div class="ep-panel" data-panel="emoji" style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px">${all.map(e=>`<button class="ep-e" data-e="${e}" style="height:34px;border-radius:8px;font-size:20px;transition:background .1s">${e}</button>`).join('')}</div>`;
+  const stickerGrid = isReact ? '' : `<div class="ep-panel" data-panel="sticker" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px">${STICKERS.map(s=>`<button class="ep-st" data-st="${s}">${s}</button>`).join('')}</div>`;
+  const html = `<div class="ep" style="width:300px;background:var(--color-bg-elevated);border:var(--hairline-width) solid var(--color-border-strong);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:10px">${tabs}${emojiGrid}${stickerGrid}</div>`;
   const w = popover(html, x?x-150:innerWidth-360, y?y-360:innerHeight-320);
   $$('.ep-e',w).forEach(b=>{b.onmouseenter=()=>b.style.background='var(--color-bg-muted)';b.onmouseleave=()=>b.style.background='';});
-  w.addEventListener('click', e=>{ const b=e.target.closest('.ep-e'); if(!b)return;
-    if (target && target.react){ toggleReact(target.react, b.dataset.e); closeOverlays(); }
+  w.addEventListener('click', e=>{
+    const tab=e.target.closest('[data-tab]');
+    if(tab){ $$('.ep-tab',w).forEach(t=>t.classList.toggle('is-active', t===tab)); $$('.ep-panel',w).forEach(p=>p.style.display = p.dataset.panel===tab.dataset.tab ? 'grid' : 'none'); return; }
+    const st=e.target.closest('[data-st]'); if(st){ sendSticker(st.dataset.st); closeOverlays(); return; }
+    const b=e.target.closest('.ep-e'); if(!b)return;
+    if (isReact){ toggleReact(target.react, b.dataset.e); closeOverlays(); }
     else { const inp=$('#cmpInput'); if(inp){inp.value+=b.dataset.e; inp.focus(); inp.closest('.cmp__bar')?.classList.add('has-text');} }
   });
 }
+function sendSticker(s){ const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(), from:'me', t:nowT(), sticker:s, read:false}); c.last={by:'me', txt:s+' Стикер', t:nowT(), read:false}; renderConversation(); renderList(); }
 function forwardPicker(mid){
   const src = mid ? threadOf(findChat(S.chatId)).find(x=>x.id===mid) : null;
   const author = src ? (src.from==='me'?U.me.name:(U[src.from]||{name:src.from}).name) : '';
