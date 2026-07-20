@@ -8,6 +8,8 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const ic = (n, cls = '') => `<svg class="icon ${cls}"><use href="#i-${n}"/></svg>`;
 const uid = (() => { let n = 1000; return () => 'x' + (++n); })();
+const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; };
+const nWord = (n, one, few, many) => n + ' ' + plural(n, one, few, many);
 const PHOTOS = [
   'radial-gradient(120% 90% at 30% 18%, #F7E0BE, transparent 55%), linear-gradient(165deg, #E7B98E, #B0705A 55%, #6E4A38)',
   'radial-gradient(120% 90% at 70% 18%, #CFE3F2, transparent 55%), linear-gradient(165deg, #93B4C9, #4F8290 55%, #2E4E58)',
@@ -53,6 +55,8 @@ const CHATS = {
       last:{by:'mark', txt:'Собираемся в 15:00 у Веры', t:'14:20'}, unread:3, typing:'vera' },
     { id:'maria', type:'client',  title:'Мария Кольцова', user:'maria', av:'e', s:'МК', folder:'clients',
       last:{by:'maria', txt:'🎤 Голосовое · 0:07', t:'14:37'}, unread:1 },
+    { id:'olga',  type:'client',  title:'Ольга Ремез', user:'olga', av:'g', s:'ОР', folder:'clients',
+      last:{by:'olga', txt:'Здравствуйте! Записалась на разбор', t:'11:40'}, unread:1 },
     { id:'alena', type:'dm',      title:'Алёна Ри', user:'alena', av:'h', s:'АР', folder:'work', draft:'Спасибо! Гляну сегодня к вечеру',
       last:{by:'alena', txt:'Разбор Марии готовлю к четвергу', t:'13:05'}, unread:0 },
     { id:'announce', type:'channel', title:'Суть · Анонсы', av:'e', s:'📣', icon:'hash', muted:true,
@@ -213,7 +217,8 @@ const chatsFor = org => org==='all'
   : (CHATS[org] || []);
 const realOrg = () => (S.org==='all' || !CHATS[S.org]) ? 'sut' : S.org;   // куда класть создаваемый чат (в «Все» — в Суть)
 const findChat = id => { for (const o in CHATS) { const c = CHATS[o].find(x=>x.id===id); if (c) return c; } return null; };
-const threadOf = c => MSGS[c.id] || lightThread(c);
+// memoize the light thread into MSGS so message ids stay stable → per-message actions work
+const threadOf = c => MSGS[c.id] || (MSGS[c.id] = lightThread(c));
 
 /* ─────────────────────────── RENDER: workspace ─────────────────────────── */
 function renderWorkspace(){
@@ -235,7 +240,7 @@ function renderWorkspace(){
 
 /* ─────────────────────────── RENDER: folders ─────────────────────────── */
 function renderFolders(){
-  const list = chatsFor(S.org);
+  const list = chatsFor(S.org).filter(c=>!c.archived);  // badges must match the list (archived live in the Архив row)
   $('#folders').innerHTML = foldersFor(S.org).map(f=>{
     let n = 0;
     if (f.id==='all') n = list.reduce((a,c)=>a+(S.read[c.id]?0:c.unread||0),0);
@@ -273,7 +278,7 @@ function renderList(){
     const unread = S.read[c.id]?0:(c.unread||0);
     const u = userOf(c);
     let snip='';
-    if (c.draft && !S.read[c.id]) snip = `<span class="chat-row__snip chat-row__snip--draft">Черновик: ${esc(c.draft)}</span>`;
+    if (c.draft) snip = `<span class="chat-row__snip chat-row__snip--draft">Черновик: ${esc(c.draft)}</span>`;
     else if (c.typing && !S.read[c.id]) snip = `<span class="chat-row__snip chat-row__snip--typing">${esc(U[c.typing].name.split(' ')[0])} печатает…</span>`;
     else {
       const pre = c.type==='group' && c.last.by!=='me' && c.last.by!=='sys' ? `<b>${esc((U[c.last.by]||{name:c.last.by}).name.split(' ')[0])}:</b> ` : (c.last.by==='me'?'Вы: ':'');
@@ -327,13 +332,12 @@ function renderConversation(){
   const main = $('#chat-main');
   const c = S.chatId ? findChat(S.chatId) : null;
   if (!c){ main.innerHTML = emptyConversation(); return; }
-  S.read[c.id] = true;
   const u = userOf(c);
   // header sub
   let sub;
   if (c.typing && c.typing!=='me'){ const tu=U[c.typing]; sub = `<span class="chat-cvhead__sub--typing">${c.type==='group'&&tu?esc(tu.name.split(' ')[0])+' печатает…':'печатает…'}</span>`; }
-  else if (c.type==='group') sub = `${c.members?.length||0} участников`;
-  else if (c.type==='channel') sub = `${c.subscribers} подписчиков`;
+  else if (c.type==='group') sub = nWord(c.members?.length||0,'участник','участника','участников');
+  else if (c.type==='channel') sub = nWord(c.subscribers,'подписчик','подписчика','подписчиков');
   else if (c.type==='saved') sub = 'заметки для себя';
   else if (u) sub = u.pr==='online' ? `<span class="chat-cvhead__sub--online">в сети</span>` : presenceLabel(u);
   else sub = '';
@@ -349,7 +353,7 @@ function renderConversation(){
     ribbon = `<div class="chat-ribbon chat-ribbon--ok">${ic('globe','icon--sm')} Внешний контакт · вход через ${esc(u?.via||'MAX')} · натал-данные не запрашиваются</div>`;
   }
 
-  const pins = PINS[c.id] || [];
+  const pins = (PINS[c.id] || []).filter(i=>i>=0 && i<threadOf(c).length);  // drop stale/out-of-range indices
   const pinCur = pins.length ? (((PINCUR[c.id] ?? (pins.length-1)) % pins.length) + pins.length) % pins.length : 0;
   const pinnedMsg = pins.length ? threadOf(c)[pins[pinCur]] : null;
   const pinTx = m => m.text || m.poll?.q || (m.media!=null?'Фото':m.file?m.file.name:m.voice?'Голосовое':'вложение');
@@ -380,10 +384,11 @@ function renderConversation(){
      ${bottom}`;
   const sc = $('#scroll');
   if (sc && S.csearch==null){
-    const toPos = () => { const sep=sc.querySelector('.chat-unread-sep');
+    const toPos = () => { const sep=S.jumpUnread ? sc.querySelector('.chat-unread-sep') : null;
       if(sep){ const scr=sc.getBoundingClientRect(), sr=sep.getBoundingClientRect(); sc.scrollTop += (sr.top - scr.top) - 56; }
       else sc.scrollTop = sc.scrollHeight; };
     toPos(); requestAnimationFrame(()=>{ if(sc.isConnected) toPos(); });
+    S.jumpUnread = false;  // only jump to the divider on the initial open, not on send/react re-renders
   }
   if (sc){ const jump=$('#chatJump'); const upd=()=>{ if(jump) jump.style.display = (sc.scrollHeight - sc.scrollTop - sc.clientHeight > 160) ? '' : 'none'; }; sc.addEventListener('scroll', upd); }
   if (S.csearch!=null){ const ci=$('#csIn'); if(ci){ ci.focus(); ci.setSelectionRange(ci.value.length,ci.value.length); } updateCSCount(); }
@@ -454,7 +459,6 @@ function renderMessages(c){
   }
   return html;
 }
-function linkify(t){ return esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a class="msg-mention" data-mention-jump="$1">@$1</a>'); }
 function renderText(raw){
   let s = esc(raw).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a class="msg-mention" data-mention-jump="$1">@$1</a>');
   if (S.csearch){ const q=S.csearch.trim(); if(q){ try{ const rx=new RegExp('('+esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')(?![^<]*>)','gi'); s=s.replace(rx,'<mark class="chat-hl">$1</mark>'); }catch(e){} } }
@@ -496,14 +500,14 @@ function onBulk(cmd){
 }
 
 function renderComposer(c){
-  if (c.type==='channel') return `<div class="cmp"><div class="cmp__broadcast">${ic('bell','icon--sm')} Канал · только владелец публикует · <button class="btn btn--link" style="height:auto">${c.muted?'Включить уведомления':'Отключить уведомления'}</button></div></div>`;
+  if (c.type==='channel') return `<div class="cmp"><div class="cmp__broadcast">${ic('bell','icon--sm')} Канал · только владелец публикует · <button class="btn btn--link" style="height:auto" data-chanmute>${c.muted?'Включить уведомления':'Отключить уведомления'}</button></div></div>`;
   const reply = S.reply ? `<div class="cmp__reply">${ic('reply','cmp__reply-ic')}<div class="cmp__reply-b"><div class="cmp__reply-who">Ответ · ${esc(S.reply.who)}</div><div class="cmp__reply-tx">${esc(S.reply.txt)}</div></div><button class="shell-icon-btn cmp__reply-x" data-clear-reply>${ic('x','icon--sm')}</button></div>` : '';
   const editBar = (S.editId && !S.reply) ? `<div class="cmp__reply">${ic('pen','cmp__reply-ic')}<div class="cmp__reply-b"><div class="cmp__reply-who">Редактирование</div><div class="cmp__reply-tx">${esc((threadOf(c).find(x=>x.id===S.editId)||{}).text||'')}</div></div><button class="shell-icon-btn cmp__reply-x" data-clear-edit>${ic('x','icon--sm')}</button></div>` : '';
   return `<div class="cmp">
     ${reply}${editBar}
-    <div class="cmp__bar">
+    <div class="cmp__bar${(c.draft&&!S.editId)?' has-text':''}">
       <button class="cmp__iconbtn" data-attach title="Прикрепить">${ic('clip','icon--sm')}</button>
-      <textarea class="cmp__input" id="cmpInput" rows="1" placeholder="Сообщение…"></textarea>
+      <textarea class="cmp__input" id="cmpInput" rows="1" placeholder="Сообщение…">${(c.draft&&!S.editId)?esc(c.draft):''}</textarea>
       <button class="cmp__iconbtn" data-emoji title="Эмодзи">${ic('smile','icon--sm')}</button>
       <button class="cmp__iconbtn" data-voice title="Голосовое">${ic('mic','icon--sm')}</button>
       <button class="cmp__send" id="cmpSend" title="Отправить">${ic('send')}</button>
@@ -519,7 +523,7 @@ function renderInfo(){
   const c = findChat(S.chatId); const u = userOf(c);
   const title = c.type==='group'?'Инфо о группе':c.type==='channel'?'Инфо о канале':c.type==='client'?'Профиль клиента':c.type==='external'?'Внешний контакт':'Профиль';
   const isPerson = u && (c.type==='dm'||c.type==='client'||c.type==='external');
-  let hero = `<div class="info__hero">${chatAvatar(c).replace('chat-avatar ','chat-avatar ')}<div class="info__hero-name">${esc(c.title)}</div><div class="info__hero-sub${u&&u.pr==='online'?' info__hero-sub--online':''}">${c.type==='group'?(c.members.length+' участников'):c.type==='channel'?(c.subscribers+' подписчиков'):u?presenceLabel(u):''}</div></div>`;
+  let hero = `<div class="info__hero">${chatAvatar(c).replace('chat-avatar ','chat-avatar ')}<div class="info__hero-name">${esc(c.title)}</div><div class="info__hero-sub${u&&u.pr==='online'?' info__hero-sub--online':''}">${c.type==='group'?nWord(c.members.length,'участник','участника','участников'):c.type==='channel'?nWord(c.subscribers,'подписчик','подписчика','подписчиков'):u?presenceLabel(u):''}</div></div>`;
   let actions = `<div class="info__actions">
     <button class="info__act" data-call="audio"><span class="info__act-ic">${ic('phone','icon--sm')}</span>Звонок</button>
     <button class="info__act" data-call="video"><span class="info__act-ic">${ic('video','icon--sm')}</span>Видео</button>
@@ -548,7 +552,7 @@ function renderInfo(){
     const roles = { me:'owner', anya:'admin', dmitry:'admin' };
     body += (c.members||[]).map(id=>{
       const mu = U[id]||{name:id,av:'c',s:'?'}; const r = roles[id];
-      return `<div class="info__member">${AVATAR(mu)}<div class="info__member-b"><div class="info__member-nm">${esc(mu.name)}${id==='me'?' (вы)':''}</div><div class="info__member-pr${mu.pr==='online'?' info__member-pr--online':''}">${presenceLabel(mu)}</div></div>${r?`<span class="info__role info__role--${r}">${r==='owner'?'владелец':'админ'}</span>`:''}</div>`;
+      return `<div class="info__member"${id!=='me'?` data-member="${id}"`:''}>${AVATAR(mu)}<div class="info__member-b"><div class="info__member-nm">${esc(mu.name)}${id==='me'?' (вы)':''}</div><div class="info__member-pr${mu.pr==='online'?' info__member-pr--online':''}">${presenceLabel(mu)}</div></div>${r?`<span class="info__role info__role--${r}">${r==='owner'?'владелец':'админ'}</span>`:''}</div>`;
     }).join('');
   }
   // tabs
@@ -623,7 +627,12 @@ function onContext(cmd, mid){
   else if (cmd==='react') { const r=$(`.msg[data-mid="${mid}"] .msg__bubble`).getBoundingClientRect(); reactBar(mid, r.left+r.width/2, r.top); }
   else if (cmd==='copy') { navigator.clipboard?.writeText(m.text||''); toast('Скопировано'); }
   else if (cmd==='edit') { S.editId=mid; S.reply=null; renderConversation(); const inp=$('#cmpInput'); if(inp){inp.value=m.text||''; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); inp.closest('.cmp__bar')?.classList.add('has-text');} }
-  else if (cmd==='delete'){ const th=MSGS[c.id]=threadOf(c).slice(); const i=th.findIndex(x=>x.id===mid); if(i>-1)th.splice(i,1); renderConversation(); toast('Сообщение удалено'); }
+  else if (cmd==='delete'){ const th=MSGS[c.id]=threadOf(c).slice(); const i=th.findIndex(x=>x.id===mid);
+    if(i>-1){ th.splice(i,1);
+      if(PINS[c.id]){ PINS[c.id]=PINS[c.id].filter(p=>p!==i).map(p=>p>i?p-1:p); if(!PINS[c.id].length)delete PINS[c.id]; }
+      if(S.unreadAt!=null && i<S.unreadAt) S.unreadAt--;
+    }
+    renderConversation(); toast('Сообщение удалено'); }
   else if (cmd==='pin'){ const idx=threadOf(c).findIndex(x=>x.id===mid); PINS[S.chatId]=PINS[S.chatId]||[]; if(!PINS[S.chatId].includes(idx)) PINS[S.chatId].push(idx); PINCUR[S.chatId]=PINS[S.chatId].length-1; renderConversation(); toast('Закреплено'); }
   else if (cmd==='forward') forwardPicker(mid);
   else if (cmd==='select'){ S.selMode=true; S.sel=new Set([mid]); renderConversation(); }
@@ -777,7 +786,7 @@ function contactPicker(){
 }
 function startDM(uid){
   const u=U[uid]; let c=chatsFor(S.org).find(x=>x.user===uid);
-  if(!c){ c={ id:'dm_'+uid+'_'+uid, type:u.kind==='client'?'client':u.kind==='external'?'external':(u.kind==='bot'?'dm':'dm'), title:u.name, user:uid, av:u.av, s:u.s, folder:'all', last:{by:'me',txt:'Чат создан',t:nowT(),read:true}, unread:0 }; CHATS[realOrg()].unshift(c); }
+  if(!c){ c={ id:'dm_'+realOrg()+'_'+uid, type:u.kind==='client'?'client':u.kind==='external'?'external':'dm', title:u.name, user:uid, av:u.av, s:u.s, folder:'all', last:{by:'me',txt:'Чат создан',t:nowT(),read:true}, unread:0 }; CHATS[realOrg()].unshift(c); }
   openChat(c.id);
 }
 
@@ -879,7 +888,7 @@ function callOverlay(chatId, kind){
   const wrap = document.createElement('div'); wrap.className='call';
   wrap.innerHTML = `
     <div class="call__top"><div class="call__top-t"><div class="call__top-nm">${esc(c.title)}</div><div class="call__top-st">${isVideo?'Видеозвонок':'Аудиозвонок'}${isGroup?' · группа':''}</div></div>
-      <button class="call__mini" data-cend title="Свернуть">${ic('maximize','icon--sm')}</button></div>
+      <button class="call__mini" data-cmin title="Свернуть">${ic('maximize','icon--sm')}</button></div>
     <div class="call__stage">${stage}</div>${extraTimer}
     <div class="call__ctrls">
       <button class="call__btn" data-cmute title="Микрофон">${ic('mic')}</button>
@@ -891,6 +900,7 @@ function callOverlay(chatId, kind){
   let secs=0; clearInterval(callTimer);
   setTimeout(()=>{ const t=$('#callTimer'); if(t)t.textContent='00:00'; callTimer=setInterval(()=>{ secs++; const t2=$('#callTimer'); if(t2)t2.textContent=`${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`; },1000); }, 900);
   wrap.addEventListener('click', e=>{
+    if(e.target.closest('[data-cmin]')){ clearInterval(callTimer); wrap.remove(); toast('Звонок свёрнут'); return; }
     if(e.target.closest('[data-cend]')){ clearInterval(callTimer); wrap.remove(); return; }
     const mu=e.target.closest('[data-cmute]'); if(mu){ mu.classList.toggle('is-off'); mu.querySelector('use').setAttribute('href', mu.classList.contains('is-off')?'#i-mic-off':'#i-mic'); return; }
     const vd=e.target.closest('[data-cvid]'); if(vd){ vd.classList.toggle('is-off'); vd.querySelector('use').setAttribute('href', vd.classList.contains('is-off')?'#i-video-off':'#i-video'); return; }
@@ -908,7 +918,7 @@ function notifDropdown(x,y){
     {ic:'message', tone:'muted', t:'<b>Аня</b>: новое сообщение', tm:'2 ч'},
   ];
   const html = `<div class="shell-bell__menu is-open" style="position:static;width:360px">
-    <div class="shell-bell__head"><div class="shell-bell__heading">Уведомления</div><button class="shell-bell__markall" title="Прочитать все">${ic('checks','icon--sm')}</button></div>
+    <div class="shell-bell__head"><div class="shell-bell__heading">Уведомления</div><button class="shell-bell__markall" title="Прочитать все" data-notifread>${ic('checks','icon--sm')}</button></div>
     <div class="shell-bell__list">${items.map(n=>`<div class="shell-bell__row${n.unread?' is-unread':''}">${n.unread?'<span class="shell-bell__row-flag"></span>':''}<div class="shell-bell__row-main"><span class="shell-bell__icon shell-bell__icon--${n.tone}">${ic(n.ic,'icon--sm')}</span><div class="shell-bell__row-body"><div class="shell-bell__row-title">${n.t}</div><div class="shell-bell__row-time">${n.tm}</div></div></div></div>`).join('')}</div>
     <a class="shell-bell__foot" data-hint="Все уведомления — в полной версии">Показать все ${ic('chev-r','icon--sm')}</a></div>`;
   popover(html, x-360, y);
@@ -961,9 +971,11 @@ function natalChartModal(u){
 
 /* ─────────────────────────── ACTIONS ─────────────────────────── */
 function openChat(id){
+  const _prev = S.chatId && findChat(S.chatId); const _inp = $('#cmpInput');   // stash the leaving chat's unsent text as a draft
+  if(_prev && _inp && !S.editId) _prev.draft = _inp.value.trim() || null;
   S.chatId = id; S.reply=null; S.editId=null; S.selMode=false; S.sel.clear(); S.csearch=null;
   const c = findChat(id);
-  if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.read[id]=true; c.unread=0; }
+  if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.jumpUnread = S.unreadAt!=null; S.read[id]=true; c.unread=0; }
   renderList(); renderFolders(); renderWorkspace(); renderConversation(); renderInfo();
   $('#chatBody').setAttribute('data-mobile','chat');
   syncURL();
@@ -976,13 +988,13 @@ function switchOrg(id){
   renderAll(); syncURL();
 }
 function setFolder(id){ S.folder=id; S.archiveView=false; renderFolders(); renderList(); }
-function setReply(m){ const who = m.from==='me'?'Вы':(U[m.from]||{name:m.from}).name; S.reply={who,txt:m.text||'вложение', mid:m.id}; renderConversation(); $('#cmpInput')?.focus(); }
+function setReply(m){ const who = m.from==='me'?'Вы':(U[m.from]||{name:m.from}).name; S.reply={who,txt:m.text||'вложение', mid:m.id}; S.editId=null; renderConversation(); $('#cmpInput')?.focus(); }
 function clearReply(){ S.reply=null; renderConversation(); }
 function send(){
   const inp=$('#cmpInput'); if(!inp)return; const v=inp.value.trim(); if(!v)return;
-  const c=findChat(S.chatId); const th = MSGS[c.id] = threadOf(c).slice();
+  const c=findChat(S.chatId); c.draft=null; const th = MSGS[c.id] = threadOf(c).slice();
   if (S.editId){ const m=th.find(x=>x.id===S.editId); if(m){m.text=v;m.edited=true;} S.editId=null; S.reply=null; renderConversation(); renderList(); return; }
-  const msg = { id:'m'+uid(), from:'me', t:nowT(), text:v, sending:true, read:false, replyTo:S.reply?{who:S.reply.who,txt:S.reply.txt}:null };
+  const msg = { id:'m'+uid(), from:'me', t:nowT(), text:v, sending:true, read:false, replyTo:S.reply?{who:S.reply.who,txt:S.reply.txt,mid:S.reply.mid}:null };
   th.push(msg);
   c.last={by:'me',txt:v,t:nowT(),read:false}; S.reply=null;
   renderConversation(); renderList();
@@ -1033,6 +1045,8 @@ function renderAll(){ renderWorkspace(); renderFolders(); renderList(); renderCo
 /* keyboard navigation */
 function visibleChats(){
   const list = chatsFor(S.org).filter(c=>{
+    if (S.archiveView) return c.archived;      // mirror renderList: J/K must match what's on screen
+    if (c.archived) return false;
     if (S.folder==='unread') return !S.read[c.id] && c.unread>0;
     if (S.folder!=='all') return c.folder===S.folder;
     return true;
@@ -1054,6 +1068,14 @@ function shortcutsOverlay(){
 /* ─────────────────────────── EVENTS ─────────────────────────── */
 document.addEventListener('click', e=>{
   const t = e.target;
+  // generic segmented control in modals (invite audience, group type, slow-mode) — visual select
+  { const so=t.closest('.segmented__option'); if(so && so.closest('.segmented') && !so.closest('.set')){ const sg=so.closest('.segmented'); $$('.segmented__option',sg).forEach(o=>o.classList.remove('segmented__option--active')); so.classList.add('segmented__option--active'); return; } }
+  // tap a group member → open a DM with them
+  { const mr=t.closest('[data-member]'); if(mr){ const id=mr.dataset.member; if(id!=='me'&&U[id]) startDM(id); return; } }
+  // channel: mute/unmute
+  { const cm=t.closest('[data-chanmute]'); if(cm){ const c=findChat(S.chatId); if(c){ c.muted=!c.muted; renderConversation(); renderList(); toast(c.muted?'Уведомления канала отключены':'Уведомления канала включены'); } return; } }
+  // notifications: mark all read (in place)
+  { const nr=t.closest('[data-notifread]'); if(nr){ $$('.shell-bell__row.is-unread').forEach(r=>r.classList.remove('is-unread')); $$('.shell-bell__row-flag').forEach(f=>f.remove()); toast('Все уведомления прочитаны'); return; } }
   // org switcher (bottom-left, «глобальная папка»)
   if (t.closest('#orgBtn')){ $('#orgSwitch').classList.toggle('is-open'); $('#orgMenu').classList.toggle('hidden'); return; }
   { const wsOpt=t.closest('[data-org]'); if(wsOpt && wsOpt.closest('#orgMenu')){ switchOrg(wsOpt.dataset.org); return; } }
@@ -1137,7 +1159,9 @@ function chatRowMenu(id, x, y){
   popover(`<div class="menu" style="min-width:232px">${acts.map((a,i)=>`<button class="menu__item" data-rowact="${i}">${ic(a.ic,'icon--sm')} ${a.label}</button>`).join('')}<div class="menu__sep"></div><button class="menu__item menu__item--danger" data-rowact="del">${ic('trash','icon--sm')} Удалить чат</button></div>`, x, y);
   _ovClick=( e=>{ const b=e.target.closest('[data-rowact]'); if(!b) return; const v=b.dataset.rowact;
     if(v==='del'){ closeOverlays(); toast('Чат удалён — в полной версии'); return; }
-    const msg=acts[+v].run(); const wasOpen=S.chatId===id; closeOverlays(); renderList(); if(wasOpen&&!c.archived) renderConversation(); toast(msg);
+    const wasOpen=S.chatId===id; const msg=acts[+v].run(); closeOverlays(); renderList();
+    if(wasOpen){ renderConversation(); if(!S.chatId && innerWidth<=900) $('#chatBody').setAttribute('data-mobile','list'); }
+    toast(msg);
   });
 }
 // context menu on right-click of a message
@@ -1258,9 +1282,9 @@ function settingsSection(sec){
         <div><div class="set__item-t" style="font-size:19px;font-family:var(--font-display)">Юрий Сёмин</div><div class="set__item-d" style="font-size:13px">@yuri · Основатель · во всех организациях</div>
         <button class="btn btn--secondary btn--sm" style="margin-top:10px" data-avedit>Сменить фото</button></div></div>
       <div class="set__card">
-        <div class="set__item"><div class="set__item-b"><div class="set__item-d">Имя</div><div class="set__item-t">Юрий Сёмин</div></div>${ic('pen','icon--sm')}</div>
-        <div class="set__item"><div class="set__item-b"><div class="set__item-d">Имя пользователя</div><div class="set__item-t">@yuri</div></div>${ic('pen','icon--sm')}</div>
-        <div class="set__item"><div class="set__item-b"><div class="set__item-d">О себе</div><div class="set__item-t">Строю экосистему «Суть» ✨</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item set__item--tap" data-hint="Редактирование имени — в полной версии"><div class="set__item-b"><div class="set__item-d">Имя</div><div class="set__item-t">Юрий Сёмин</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item set__item--tap" data-hint="Смена ника — в полной версии"><div class="set__item-b"><div class="set__item-d">Имя пользователя</div><div class="set__item-t">@yuri</div></div>${ic('pen','icon--sm')}</div>
+        <div class="set__item set__item--tap" data-hint="Редактирование «О себе» — в полной версии"><div class="set__item-b"><div class="set__item-d">О себе</div><div class="set__item-t">Строю экосистему «Суть» ✨</div></div>${ic('pen','icon--sm')}</div>
         <div class="set__item"><div class="set__item-b"><div class="set__item-d">Телефон</div><div class="set__item-t">+7 905 •••‑00‑01</div></div>${ic('lock','icon--sm')}</div>
       </div>`;
   }
@@ -1301,23 +1325,23 @@ function settingsSection(sec){
       </div></div>
       <div class="set__group"><div class="set__grouph">Сообщения</div><div class="set__card">
         ${toggleRow('Отправлять «Прочитано»','Если выключить — ты тоже не видишь чужие',true)}
-        <div class="set__item"><div class="set__item-b"><div class="set__item-t">Заблокированные</div><div class="set__item-d">Никого</div></div>${ic('chev-r','icon--sm')}</div>
+        <div class="set__item set__item--tap" data-hint="Список заблокированных — в полной версии"><div class="set__item-b"><div class="set__item-t">Заблокированные</div><div class="set__item-d">Никого</div></div>${ic('chev-r','icon--sm')}</div>
       </div></div>`;
   }
   if (sec==='devices'){
     return `<div class="set__h">Устройства</div><div class="set__sub">Активные сеансы.</div>
       <div class="set__card">
         <div class="set__item"><span class="info__act-ic" style="background:var(--color-success-soft);color:var(--color-success-text)">${ic('globe','icon--sm')}</span><div class="set__item-b"><div class="set__item-t">Chrome · macOS · этот компьютер</div><div class="set__item-d">Самара · сейчас онлайн</div></div></div>
-        <div class="set__item"><span class="info__act-ic">${ic('message','icon--sm')}</span><div class="set__item-b"><div class="set__item-t">iPhone · Суть Чат</div><div class="set__item-d">был онлайн 2 ч назад</div></div><button class="btn btn--ghost btn--sm">Выйти</button></div>
+        <div class="set__item"><span class="info__act-ic">${ic('message','icon--sm')}</span><div class="set__item-b"><div class="set__item-t">iPhone · Суть Чат</div><div class="set__item-d">был онлайн 2 ч назад</div></div><button class="btn btn--ghost btn--sm" data-hint="Завершение сеанса iPhone — в полной версии">Выйти</button></div>
       </div>
-      <button class="btn btn--outline btn--md" style="margin-top:16px;color:var(--color-danger-text);border-color:var(--color-danger-soft)">Завершить все другие сеансы</button>`;
+      <button class="btn btn--outline btn--md" style="margin-top:16px;color:var(--color-danger-text);border-color:var(--color-danger-soft)" data-hint="Завершение всех сеансов — в полной версии">Завершить все другие сеансы</button>`;
   }
   if (sec==='orgs'){
     return `<div class="set__h">Организации</div><div class="set__sub">Рабочие пространства, где ты состоишь.</div>
       <div class="set__card">
-        ${Object.entries(ORGS).map(([id,o])=>`<div class="set__item"><span class="chat-ws__logo" style="width:38px;height:38px">${esc(o.logo)}</span><div class="set__item-b"><div class="set__item-t">${esc(o.name)}</div><div class="set__item-d">${id==='sut'?'Владелец':id==='personal'?'Личное пространство':'Администратор'}</div></div>${id!=='personal'?`<button class="btn btn--ghost btn--sm">Выйти</button>`:''}</div>`).join('')}
+        ${Object.entries(ORGS).map(([id,o])=>`<div class="set__item"><span class="chat-ws__logo" style="width:38px;height:38px">${esc(o.logo)}</span><div class="set__item-b"><div class="set__item-t">${esc(o.name)}</div><div class="set__item-d">${id==='sut'?'Владелец':id==='personal'?'Личное пространство':'Администратор'}</div></div>${id!=='personal'?`<button class="btn btn--ghost btn--sm" data-hint="Выход из организации — в полной версии">Выйти</button>`:''}</div>`).join('')}
       </div>
-      <button class="btn btn--secondary btn--md" style="margin-top:16px">${ic('plus','icon--sm')} Создать организацию</button>`;
+      <button class="btn btn--secondary btn--md" style="margin-top:16px" data-neworg>${ic('plus','icon--sm')} Создать организацию</button>`;
   }
   return '';
 }
@@ -1344,6 +1368,7 @@ function renderSettings(sec){
 function applySetting(kind,val){
   if (kind==='theme'){ const d=document.documentElement; if(val==='dark'){d.setAttribute('data-theme','dark');localStorage.setItem('the-essence:theme','dark');} else if(val==='light'){d.removeAttribute('data-theme');localStorage.setItem('the-essence:theme','light');} else {localStorage.removeItem('the-essence:theme'); if(matchMedia('(prefers-color-scheme: dark)').matches)d.setAttribute('data-theme','dark');else d.removeAttribute('data-theme');} }
   else if (kind==='density'){ document.documentElement.setAttribute('data-density', val); }
+  else if (kind==='textsize'){ document.documentElement.setAttribute('data-textsize', val); }
 }
 
 /* ─────────────────────────── JOIN LANDING (invite by link) ─────────────────────────── */
