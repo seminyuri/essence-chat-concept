@@ -347,8 +347,10 @@ function renderConversation(){
      </div>
      ${ribbon}${pinBar}${searchBar}
      <div class="chat-scroll${S.selMode?' is-selmode':''}" id="scroll">${renderMessages(c)}</div>
+     <button class="chat-jump" id="chatJump" title="Вниз" style="display:none">${ic('arrow-down')}</button>
      ${bottom}`;
   const sc = $('#scroll'); if (sc && S.csearch==null) sc.scrollTop = sc.scrollHeight;
+  if (sc){ const jump=$('#chatJump'); const upd=()=>{ if(jump) jump.style.display = (sc.scrollHeight - sc.scrollTop - sc.clientHeight > 160) ? '' : 'none'; }; sc.addEventListener('scroll', upd); }
   if (S.csearch!=null){ const ci=$('#csIn'); if(ci){ ci.focus(); ci.setSelectionRange(ci.value.length,ci.value.length); } updateCSCount(); }
 }
 function emptyConversation(){
@@ -958,6 +960,7 @@ document.addEventListener('click', e=>{
   if (t.closest('[data-invite]')){ inviteModal(); return; }
   if (t.closest('[data-natal]')){ toggleInfo(true); return; }
   // composer
+  if (t.closest('#chatJump')){ const sc=$('#scroll'); if(sc) sc.scrollTo({top:sc.scrollHeight, behavior:'smooth'}); return; }
   if (t.closest('#cmpSend')){ send(); return; }
   { const so=t.closest('[data-sendopt]'); if(so){ closeOverlays(); if($('#cmpInput')?.value.trim()) send(); toast(so.dataset.sendopt==='silent'?'Отправлено без звука':'Запланировано на завтра, 09:00'); return; } }
   if (t.closest('[data-clear-reply]')){ clearReply(); return; }
