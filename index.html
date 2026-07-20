@@ -115,17 +115,6 @@
     <!-- ─── chat list ─── -->
     <aside class="chat-list">
       <div class="chat-list__head">
-        <div class="chat-ws" id="wsSwitch">
-          <button class="chat-ws__btn" id="wsBtn">
-            <span class="chat-ws__logo" id="wsLogo">СД</span>
-            <span class="chat-ws__info">
-              <span class="chat-ws__name" id="wsName">Суть Души</span>
-              <span class="chat-ws__sub" id="wsSub">12 чатов · 4 непрочитанных</span>
-            </span>
-            <svg class="icon icon--sm chat-ws__chev"><use href="#i-chev-d"/></svg>
-          </button>
-          <div class="chat-ws__menu hidden" id="wsMenu"></div>
-        </div>
         <div class="chat-list__tools">
           <label class="chat-search">
             <svg class="icon icon--sm"><use href="#i-search"/></svg>
@@ -136,6 +125,17 @@
       </div>
       <nav class="chat-folders" id="folders"></nav>
       <div class="chat-list__scroll" id="chatList"></div>
+      <div class="shell-ws" id="orgSwitch">
+        <button class="shell-ws__current" id="orgBtn">
+          <span class="shell-ws__logo" id="orgLogo">СД</span>
+          <span class="shell-ws__info">
+            <span class="shell-ws__name" id="orgName">Суть Души</span>
+            <span class="shell-ws__role" id="orgRole">Основатель</span>
+          </span>
+          <svg class="icon icon--sm shell-ws__chev"><use href="#i-chev-d"/></svg>
+        </button>
+        <div class="shell-ws__menu hidden" id="orgMenu"></div>
+      </div>
     </aside>
 
     <!-- ─── conversation ─── -->

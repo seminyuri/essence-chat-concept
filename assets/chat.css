@@ -188,6 +188,8 @@ html, body { height: 100%; overflow: hidden; }
 .chat-row__pin { color: var(--color-fg-subtle); }
 .chat-list__sec { font-family: var(--type-mono); font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase;
                   color: var(--color-fg-subtle); padding: 12px 12px 5px; }
+.chat-row__orgtag { flex: none; font-family: var(--type-mono); font-size: 9px; font-weight: 600; color: var(--color-fg-subtle);
+                    background: var(--color-bg-muted); padding: 1px 6px; border-radius: var(--radius-full); white-space: nowrap; }
 
 /* ════════════════════════════ CONVERSATION ════════════════════════════ */
 .chat-cvhead { position: relative; z-index: 2; flex: none; height: 60px; display: flex; align-items: center; gap: 12px;
@@ -519,6 +521,23 @@ html, body { height: 100%; overflow: hidden; }
 .msg__bubble--bare { background: none !important; border: none !important; box-shadow: none !important; padding: 0 2px !important; }
 .msg-in { animation: msg-in var(--motion-duration-base) var(--ease-spring); }
 @keyframes msg-in { from { opacity: 0; transform: translateY(9px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* lightbox (media viewer) */
+.lightbox { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 40px;
+            background: rgba(12,10,7,.86); backdrop-filter: blur(8px); animation: modal-in var(--motion-duration-base) var(--motion-ease); }
+.lightbox__img { border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); }
+.lightbox__close { position: absolute; top: 20px; right: 24px; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+                   color: #F4EFE7; background: rgba(244,239,231,.12); transition: background var(--motion-duration-fast) var(--motion-ease); }
+.lightbox__close:hover { background: rgba(244,239,231,.24); }
+
+/* context menu with reaction row on top (Telegram-style) */
+.ctx-wrap { display: flex; flex-direction: column; gap: 8px; }
+.ctx-react { display: flex; gap: 2px; padding: 5px; background: var(--color-bg-elevated);
+             border: var(--hairline-width) solid var(--color-border-strong); border-radius: var(--radius-full); box-shadow: var(--shadow-pop); }
+.ctx-react__e { width: 36px; height: 36px; border-radius: 50%; font-size: 19px; display: grid; place-items: center; color: var(--color-fg-muted);
+                transition: transform var(--motion-duration-fast) var(--ease-pop), background var(--motion-duration-fast) var(--motion-ease); }
+.ctx-react__e:hover { transform: scale(1.22); background: var(--color-bg-muted); }
+.ctx-react__more:hover { transform: scale(1.1); }
 
 /* ════════════════════════ PINNED BAR / IN-CHAT SEARCH ════════════════════════ */
 .chat-pinned { position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 11px; padding: 7px 12px 7px 16px;

@@ -155,7 +155,7 @@ const FOLDERS_BY_ORG = {
   izum:     [ {id:'all',name:'Все'}, {id:'unread',name:'Непроч.'} ],
   personal: [ {id:'all',name:'Все'} ],
 };
-const foldersFor = org => FOLDERS_BY_ORG[org] || FOLDERS_BY_ORG.sut;
+const foldersFor = org => org==='all' ? [{id:'all',name:'Все'},{id:'unread',name:'Непроч.'}] : (FOLDERS_BY_ORG[org] || FOLDERS_BY_ORG.sut);
 
 /* ─────────────────────────── STATE ─────────────────────────── */
 const P = new URLSearchParams(location.search);
@@ -174,29 +174,28 @@ const S = {
 const PINS = { team: 3 };  // chatId -> pinned message index
 
 const userOf = c => U[c.user] || null;
-const chatsFor = org => CHATS[org] || [];
+const chatsFor = org => org==='all'
+  ? Object.keys(CHATS).flatMap(o => CHATS[o].map(c => Object.assign(c, {_org:o})))
+  : (CHATS[org] || []);
 const findChat = id => { for (const o in CHATS) { const c = CHATS[o].find(x=>x.id===id); if (c) return c; } return null; };
 const threadOf = c => MSGS[c.id] || lightThread(c);
 
 /* ─────────────────────────── RENDER: workspace ─────────────────────────── */
 function renderWorkspace(){
-  const o = ORGS[S.org];
-  $('#wsLogo').textContent = o.logo;
-  $('#wsLogo').style.background = '';
-  $('#wsName').textContent = o.name;
-  const list = chatsFor(S.org); const un = list.reduce((a,c)=>a+(S.read[c.id]?0:c.unread||0),0);
-  $('#wsSub').textContent = `${list.length} чатов${un?` · ${un} непроч.`:''}`;
-  document.documentElement.setAttribute('data-org', S.org);
-  // menu
-  $('#wsMenu').innerHTML = Object.entries(ORGS).map(([id,org])=>{
-    const un = chatsFor(id).reduce((a,c)=>a+(S.read[c.id]?0:c.unread||0),0);
-    return `<button class="chat-ws__opt${id===S.org?' is-active':''}" data-org="${id}">
-      <span class="chat-ws__logo">${esc(org.logo)}</span>
-      <span class="chat-ws__optname">${esc(org.name)}</span>
-      ${un?`<span class="chat-ws__optbadge">${un}</span>`:''}
-    </button>`;
-  }).join('') + `<div class="chat-ws__sep"></div>
-    <button class="chat-ws__add">${ic('plus','icon--sm')} Добавить организацию</button>`;
+  const isAll = S.org==='all';
+  const o = isAll ? {name:'Все организации', logo:'∀'} : ORGS[S.org];
+  $('#orgLogo').textContent = o.logo;
+  $('#orgName').textContent = o.name;
+  $('#orgRole').textContent = isAll ? `${Object.keys(ORGS).length} организации · глобально` : (S.org==='sut'?'Основатель':S.org==='personal'?'Личное пространство':'Администратор');
+  if (isAll) document.documentElement.removeAttribute('data-org'); else document.documentElement.setAttribute('data-org', S.org);
+  const totalUn = o2 => chatsFor(o2).reduce((a,c)=>a+(S.read[c.id]?0:c.unread||0),0);
+  const allUn = Object.keys(ORGS).reduce((a,o2)=>a+totalUn(o2),0);
+  const item = (id, name, logo, un, active) => `<button class="shell-ws__item${active?' is-active':''}" data-org="${id}"><span class="chat-ws__logo" style="width:26px;height:26px;font-size:11px;border-radius:8px">${esc(logo)}</span><span class="shell-ws__item-name">${esc(name)}</span>${un?`<span class="chat-ws__optbadge">${un}</span>`:''}${active?`<svg class="icon icon--sm shell-ws__check"><use href="#i-check"/></svg>`:''}</button>`;
+  $('#orgMenu').innerHTML = `<div class="shell-ws__cap">Глобальная папка</div>`
+    + item('all','Все организации','∀',allUn,isAll)
+    + `<div class="shell-ws__div"></div>`
+    + Object.entries(ORGS).map(([id,org])=>item(id,org.name,org.logo,totalUn(id),id===S.org)).join('')
+    + `<div class="shell-ws__div"></div><button class="shell-ws__link" data-neworg>${ic('plus','icon--sm')} Добавить организацию</button>`;
 }
 
 /* ─────────────────────────── RENDER: folders ─────────────────────────── */
@@ -246,6 +245,7 @@ function renderList(){
       <div class="chat-row__body">
         <div class="chat-row__top">
           <span class="chat-row__name">${c.icon==='hash'?ic('hash','icon--sm chat-row__vfy'):''}${esc(c.title)}${u&&u.kind==='specialist'?ic('sparkles','icon--xs chat-row__vfy'):''}</span>
+          ${S.org==='all'&&c._org?`<span class="chat-row__orgtag">${esc(ORGS[c._org].name.split(' ')[0])}</span>`:''}
           <span class="chat-row__time">${esc(c.last.t)}</span>
         </div>
         <div class="chat-row__bot">
@@ -345,10 +345,10 @@ function renderMessages(c){
     const showAuthor = !out && (c.type==='group') && !grouped;
     // body
     let body = '';
-    if (m.replyTo) body += `<div class="msg__reply"><span class="msg__reply-bar"></span><div style="min-width:0"><div class="msg__reply-who">${esc(m.replyTo.who)}</div><div class="msg__reply-txt">${esc(m.replyTo.txt)}</div></div></div>`;
+    if (m.replyTo){ const _tgt = m.replyTo.mid || (threadOf(c).find(x=>x.text && m.replyTo.txt && x.text.includes(m.replyTo.txt))||{}).id || ''; body += `<div class="msg__reply"${_tgt?` data-jumpreply="${_tgt}"`:''}><span class="msg__reply-bar"></span><div style="min-width:0"><div class="msg__reply-who">${esc(m.replyTo.who)}</div><div class="msg__reply-txt">${esc(m.replyTo.txt)}</div></div></div>`; }
     if (m.fwd) body += `<div class="msg__fwd">${ic('forward','icon--xs')} Переслано от <b>${esc(m.fwd)}</b></div>`;
     if (showAuthor) body = `<div class="msg__author msg__author${AUTHOR_CLASS[m.from]||''}">${esc(from.name)}</div>` + body;
-    if (m.media) body += `<div class="msg__media"><div style="aspect-ratio:16/10;background:linear-gradient(135deg,var(--cal-${m.media.grad==='e'?'amber':'rose'}),var(--color-accent-strong))"></div></div>${m.cap?`<div class="msg__mediacap">${esc(m.cap)}</div>`:''}`;
+    if (m.media) body += `<div class="msg__media" data-grad="${m.media.grad}" style="cursor:zoom-in"><div style="aspect-ratio:16/10;background:linear-gradient(135deg,var(--cal-${m.media.grad==='e'?'amber':m.media.grad==='c'?'teal':'rose'}),var(--color-accent-strong))"></div></div>${m.cap?`<div class="msg__mediacap">${esc(m.cap)}</div>`:''}`;
     if (m.file) body += `<div class="msg__file"><span class="msg__file-ic">${ic('file')}</span><div style="min-width:0"><div class="msg__file-nm">${esc(m.file.name)}</div><div class="msg__file-sz">${esc(m.file.size)}</div></div><button class="shell-icon-btn">${ic('download','icon--sm')}</button></div>`;
     if (m.voice){
       const bars = m.voice.wave.map(h=>`<span style="height:${Math.max(20,h*3)}%"></span>`).join('');
@@ -491,6 +491,13 @@ function renderInfo(){
 /* ─────────────────────────── OVERLAYS ─────────────────────────── */
 const OV = $('#overlays');
 function closeOverlays(){ OV.innerHTML=''; }
+function lightbox(grad){
+  const g = grad==='e'?'amber':grad==='c'?'teal':grad==='d'?'blush':'rose';
+  const w = document.createElement('div'); w.className='lightbox';
+  w.innerHTML = `<button class="lightbox__close" data-lbclose>${ic('x')}</button><div class="lightbox__img" style="width:min(760px,90vw);aspect-ratio:16/10;background:linear-gradient(135deg,var(--cal-${g}),var(--color-accent-strong))"></div>`;
+  document.body.appendChild(w);
+  w.addEventListener('click', e=>{ if(e.target.closest('[data-lbclose]')||e.target.classList.contains('lightbox')) w.remove(); });
+}
 function popover(html, x, y, cls=''){
   closeOverlays();
   const w = document.createElement('div'); w.className='ov-pop '+cls; w.innerHTML=html;
@@ -519,7 +526,6 @@ function contextMenu(mid, x, y){
   const own = m && m.from==='me';
   const items = [
     ['reply','Ответить','reply'],
-    ['react','Реакция','smile'],
     ['forward','Переслать','forward'],
     ['copy','Копировать','copy'],
     ['pin','Закрепить','pin'],
@@ -527,8 +533,14 @@ function contextMenu(mid, x, y){
     ['select','Выделить','check'],
     own?['delete','Удалить','trash','danger']:null,
   ].filter(Boolean);
-  popover(`<div class="menu" style="min-width:184px">${items.map(it=>`<button class="menu__item${it[3]?' menu__item--danger':''}" data-cm="${it[0]}">${ic(it[2],'icon--sm')} ${it[1]}</button>`).join('')}</div>`, x, y);
-  OV.addEventListener('click', e=>{ const b=e.target.closest('[data-cm]'); if(!b)return; onContext(b.dataset.cm, mid); closeOverlays(); });
+  const emojiRow = `<div class="ctx-react">${EMOJI.slice(0,7).map(e=>`<button class="ctx-react__e" data-ctxe="${e}">${e}</button>`).join('')}<button class="ctx-react__e ctx-react__more" data-ctxmore>${ic('plus','icon--sm')}</button></div>`;
+  const menu = `<div class="menu" style="min-width:206px">${items.map(it=>`<button class="menu__item${it[3]?' menu__item--danger':''}" data-cm="${it[0]}">${ic(it[2],'icon--sm')} ${it[1]}</button>`).join('')}</div>`;
+  popover(`<div class="ctx-wrap">${emojiRow}${menu}</div>`, x, y);
+  OV.addEventListener('click', e=>{
+    const ee=e.target.closest('[data-ctxe]'); if(ee){ toggleReact(mid, ee.dataset.ctxe); closeOverlays(); return; }
+    if(e.target.closest('[data-ctxmore]')){ emojiPicker({react:mid}, x, y); return; }
+    const b=e.target.closest('[data-cm]'); if(b){ onContext(b.dataset.cm, mid); closeOverlays(); }
+  });
 }
 function onContext(cmd, mid){
   const c = findChat(S.chatId); const m = threadOf(c).find(x=>x.id===mid); if(!m)return;
@@ -806,8 +818,7 @@ function openChat(id){
 }
 function switchOrg(id){
   S.org=id; S.chatId=null; S.folder='all'; localStorage.setItem('sut-chat:org',id);
-  document.documentElement.setAttribute('data-org', id);
-  $('#wsSwitch').classList.remove('is-open'); $('#wsMenu').classList.add('hidden');
+  $('#orgSwitch')?.classList.remove('is-open'); $('#orgMenu')?.classList.add('hidden');
   renderAll(); syncURL();
 }
 function setFolder(id){ S.folder=id; renderFolders(); renderList(); }
@@ -842,9 +853,10 @@ function renderAll(){ renderWorkspace(); renderFolders(); renderList(); renderCo
 /* ─────────────────────────── EVENTS ─────────────────────────── */
 document.addEventListener('click', e=>{
   const t = e.target;
-  // ws switcher
-  if (t.closest('#wsBtn')){ const s=$('#wsSwitch'); s.classList.toggle('is-open'); $('#wsMenu').classList.toggle('hidden'); return; }
-  const wsOpt=t.closest('[data-org]'); if(wsOpt && wsOpt.closest('#wsMenu')){ switchOrg(wsOpt.dataset.org); return; }
+  // org switcher (bottom-left, «глобальная папка»)
+  if (t.closest('#orgBtn')){ $('#orgSwitch').classList.toggle('is-open'); $('#orgMenu').classList.toggle('hidden'); return; }
+  { const wsOpt=t.closest('[data-org]'); if(wsOpt && wsOpt.closest('#orgMenu')){ switchOrg(wsOpt.dataset.org); return; } }
+  if (t.closest('[data-neworg]')){ toast('Создание организации — в полной версии'); return; }
   // folders
   const f=t.closest('[data-folder]'); if(f){ setFolder(f.dataset.folder); return; }
   // open chat row
@@ -874,6 +886,8 @@ document.addEventListener('click', e=>{
     const bb=t.closest('[data-bulk]'); if(bb){ onBulk(bb.dataset.bulk); return; }
     const ms=t.closest('.msg'); if(ms){ const id=ms.dataset.mid; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); ms.classList.toggle('is-selected'); const bn=$('#bulkN'); if(bn)bn.textContent=S.sel.size+' выбрано'; if(S.sel.size===0)exitSel(); return; }
   }
+  { const jr=t.closest('[data-jumpreply]'); if(jr){ flashMsg(jr.dataset.jumpreply); return; } }
+  { const md=t.closest('.msg__media'); if(md && !S.selMode){ lightbox(md.dataset.grad); return; } }
   { const vt=t.closest('[data-vote]'); if(vt){ const ms=t.closest('.msg'); if(ms)votePoll(ms.dataset.mid,+vt.dataset.vote); return; } }
   // info tabs
   const it=t.closest('[data-infotab]'); if(it){ S.infoTab=it.dataset.infotab; renderInfo(); return; }
@@ -908,7 +922,7 @@ $('#listSearch').addEventListener('input', e=>{ S.search=e.target.value; renderL
 // composer: enter to send, autosize
 document.addEventListener('keydown', e=>{
   if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); cmdk(); return; }
-  if (e.key==='Escape'){ closeOverlays(); return; }
+  if (e.key==='Escape'){ document.querySelector('.lightbox')?.remove(); closeOverlays(); return; }
   if (e.target.id==='cmpInput'){
     if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
   }
