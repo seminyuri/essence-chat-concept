@@ -330,10 +330,10 @@ function renderConversation(){
   const u = userOf(c);
   // header sub
   let sub;
-  if (c.type==='group') sub = `${c.members?.length||0} участников`;
+  if (c.typing && c.typing!=='me'){ const tu=U[c.typing]; sub = `<span class="chat-cvhead__sub--typing">${c.type==='group'&&tu?esc(tu.name.split(' ')[0])+' печатает…':'печатает…'}</span>`; }
+  else if (c.type==='group') sub = `${c.members?.length||0} участников`;
   else if (c.type==='channel') sub = `${c.subscribers} подписчиков`;
   else if (c.type==='saved') sub = 'заметки для себя';
-  else if (c.typing) sub = `<span class="chat-cvhead__sub--typing">печатает…</span>`;
   else if (u) sub = u.pr==='online' ? `<span class="chat-cvhead__sub--online">в сети</span>` : presenceLabel(u);
   else sub = '';
 
@@ -443,6 +443,12 @@ function renderMessages(c){
       <div class="msg__col"><div class="msg__bubble${bare}">${body}${meta}</div>${reacts}${hover}</div>
     </div>`;
   });
+  if (c.typing && c.typing!=='me' && U[c.typing]){
+    html += `<div class="msg msg--in msg--typing">
+      <div class="msg__avatar">${AVATAR(U[c.typing])}</div>
+      <div class="msg__col"><div class="msg__bubble msg__bubble--typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>
+    </div>`;
+  }
   return html;
 }
 function linkify(t){ return esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/@(\w+)/g,'<a href="#" style="color:var(--color-accent-strong)">@$1</a>'); }
@@ -928,7 +934,7 @@ function groupAdminModal(chatId){
 function openChat(id){
   S.chatId = id; S.reply=null; S.editId=null;
   const c = findChat(id);
-  if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.read[id]=true; c.unread=0; c.typing=null; }
+  if(c){ const th=threadOf(c); S.unreadAt = (!S.read[id] && c.unread>0) ? Math.max(0, th.length - c.unread) : null; S.read[id]=true; c.unread=0; }
   renderList(); renderFolders(); renderWorkspace(); renderConversation(); renderInfo();
   $('#chatBody').setAttribute('data-mobile','chat');
   syncURL();
