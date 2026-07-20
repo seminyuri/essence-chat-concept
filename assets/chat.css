@@ -44,7 +44,12 @@
 html, body { height: 100%; overflow: hidden; }
 .chat-app { display: flex; flex-direction: column; height: 100dvh; }
 .chat-body {
-  flex: 1; min-height: 0; display: flex; align-items: stretch;
+  flex: 1; min-height: 0; display: flex; align-items: stretch; position: relative;
+}
+/* medium screens: info panel overlays the conversation instead of squeezing it */
+@media (min-width: 901px) and (max-width: 1160px) {
+  .chat-info:not([hidden]) { position: absolute; right: 56px; top: 0; bottom: 0; z-index: 30;
+                             box-shadow: var(--shadow-pop); }
 }
 /* three content columns + the cross-module app-rail (from shell.css) on the far right */
 .chat-list   { width: var(--chat-list-w); flex: none; display: flex; flex-direction: column;

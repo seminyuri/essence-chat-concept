@@ -204,6 +204,7 @@ const userOf = c => U[c.user] || null;
 const chatsFor = org => org==='all'
   ? Object.keys(CHATS).flatMap(o => CHATS[o].map(c => Object.assign(c, {_org:o})))
   : (CHATS[org] || []);
+const realOrg = () => (S.org==='all' || !CHATS[S.org]) ? 'sut' : S.org;   // куда класть создаваемый чат (в «Все» — в Суть)
 const findChat = id => { for (const o in CHATS) { const c = CHATS[o].find(x=>x.id===id); if (c) return c; } return null; };
 const threadOf = c => MSGS[c.id] || lightThread(c);
 
@@ -707,7 +708,7 @@ function contactPicker(){
 }
 function startDM(uid){
   const u=U[uid]; let c=chatsFor(S.org).find(x=>x.user===uid);
-  if(!c){ c={ id:'dm_'+uid+'_'+uid, type:u.kind==='client'?'client':u.kind==='external'?'external':(u.kind==='bot'?'dm':'dm'), title:u.name, user:uid, av:u.av, s:u.s, folder:'all', last:{by:'me',txt:'Чат создан',t:nowT(),read:true}, unread:0 }; CHATS[S.org].unshift(c); }
+  if(!c){ c={ id:'dm_'+uid+'_'+uid, type:u.kind==='client'?'client':u.kind==='external'?'external':(u.kind==='bot'?'dm':'dm'), title:u.name, user:uid, av:u.av, s:u.s, folder:'all', last:{by:'me',txt:'Чат создан',t:nowT(),read:true}, unread:0 }; CHATS[realOrg()].unshift(c); }
   openChat(c.id);
 }
 
@@ -739,7 +740,7 @@ function newGroupModal(){
     if(e.target.closest('[data-next]')){ step=2; render(); return; }
     if(e.target.closest('[data-back]')){ step=1; render(); updChips(); return; }
     const col=e.target.closest('[data-color]'); if(col){ color=col.dataset.color; $$('.grp-color').forEach(x=>x.classList.remove('is-c')); col.classList.add('is-c'); const av=$('#grpav'); if(av)av.className='chat-avatar chat-avatar--'+color; return; }
-    if(e.target.closest('[data-create]')){ const name=$('#grpname')?.value.trim()||'Новая группа'; const c={ id:'g_'+uid(), type:'group', title:name, av:color, s:name.replace(/[^\p{L}]/gu,'').slice(0,2).toUpperCase()||'Г', folder:'all', members:['me',...chosen], last:{by:'me',txt:'Группа создана',t:nowT(),read:true}, unread:0 }; CHATS[S.org].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'<b>Вы</b> создали группу «'+esc(name)+'»'}]; closeOverlays(); openChat(c.id); toast('Группа создана'); return; }
+    if(e.target.closest('[data-create]')){ const name=$('#grpname')?.value.trim()||'Новая группа'; const c={ id:'g_'+uid(), type:'group', title:name, av:color, s:name.replace(/[^\p{L}]/gu,'').slice(0,2).toUpperCase()||'Г', folder:'all', members:['me',...chosen], last:{by:'me',txt:'Группа создана',t:nowT(),read:true}, unread:0 }; CHATS[realOrg()].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'<b>Вы</b> создали группу «'+esc(name)+'»'}]; closeOverlays(); openChat(c.id); toast('Группа создана'); return; }
   });
 }
 
@@ -752,7 +753,7 @@ function newChannelModal(){
       <label class="field" style="margin-bottom:14px"><span class="field__label">Описание</span><textarea class="input" style="height:auto;min-height:60px;padding:10px 12px" placeholder="О чём канал"></textarea></label>
       <div class="set__card"><div class="set__item"><div class="set__item-b"><div class="set__item-t">Публичный</div><div class="set__item-d">Виден по ссылке всем в организации</div></div><label class="toggle"><input type="checkbox" class="toggle__input" checked><span class="toggle__track"><span class="toggle__thumb"></span></span></label></div></div></div>
     <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-createch>Создать</button></div>`,'sm');
-  OV.addEventListener('click', e=>{ if(e.target.closest('[data-createch]')){ const name=$('#chname')?.value.trim()||'Новый канал'; const c={id:'ch_'+uid(),type:'channel',title:name,av:'e',s:'📣',icon:'hash',folder:'all',last:{by:'sys',txt:'Канал создан',t:nowT()},unread:0,subscribers:1}; CHATS[S.org].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'Канал «'+esc(name)+'» создан'}]; closeOverlays(); openChat(c.id); toast('Канал создан'); } });
+  OV.addEventListener('click', e=>{ if(e.target.closest('[data-createch]')){ const name=$('#chname')?.value.trim()||'Новый канал'; const c={id:'ch_'+uid(),type:'channel',title:name,av:'e',s:'📣',icon:'hash',folder:'all',last:{by:'sys',txt:'Канал создан',t:nowT()},unread:0,subscribers:1}; CHATS[realOrg()].unshift(c); MSGS[c.id]=[{from:'sys',service:true,text:'Канал «'+esc(name)+'» создан'}]; closeOverlays(); openChat(c.id); toast('Канал создан'); } });
 }
 
 /* avatar crop */
@@ -993,13 +994,22 @@ $('#listSearch').addEventListener('input', e=>{ S.search=e.target.value; renderL
 // composer: enter to send, autosize
 document.addEventListener('keydown', e=>{
   if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); cmdk(); return; }
-  if (e.key==='Escape'){ document.querySelector('.lightbox')?.remove(); closeOverlays(); return; }
+  if (e.key==='Escape'){
+    const lb=document.querySelector('.lightbox'); if(lb){ lb.remove(); return; }
+    const call=document.querySelector('.call'); if(call){ clearInterval(callTimer); call.remove(); return; }
+    if (OV.children.length){ closeOverlays(); return; }
+    if (S.csearch!=null){ S.csearch=null; renderConversation(); return; }
+    if (S.selMode){ exitSel(); return; }
+    if (S.info){ toggleInfo(false); if(innerWidth<=900)$('#chatBody').setAttribute('data-mobile','chat'); return; }
+    return;
+  }
   if (e.target.id==='cmpInput'){
     if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
     return;
   }
   const inField = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
-  if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey){
+  const overlayOpen = OV.children.length || document.querySelector('.lightbox, .call, .jn, .set');
+  if (!inField && !overlayOpen && !e.metaKey && !e.ctrlKey && !e.altKey){
     const k=e.key.toLowerCase();
     if (k==='j'){ e.preventDefault(); navChat(1); return; }
     if (k==='k'){ e.preventDefault(); navChat(-1); return; }
