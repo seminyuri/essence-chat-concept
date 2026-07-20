@@ -651,7 +651,7 @@ function emojiPicker(target, x, y){
     else { const inp=$('#cmpInput'); if(inp){inp.value+=b.dataset.e; inp.focus(); inp.closest('.cmp__bar')?.classList.add('has-text');} }
   });
 }
-function sendSticker(s){ const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(), from:'me', t:nowT(), sticker:s, read:false}); c.last={by:'me', txt:s+' Стикер', t:nowT(), read:false}; renderConversation(); renderList(); }
+function sendSticker(s){ const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); const id='m'+uid(); th.push({id, from:'me', t:nowT(), sticker:s, read:false}); c.last={by:'me', txt:s+' Стикер', t:nowT(), read:false}; renderConversation(); renderList(); $(`.msg[data-mid="${id}"]`)?.classList.add('msg-in'); }
 function forwardPicker(mid){
   const src = mid ? threadOf(findChat(S.chatId)).find(x=>x.id===mid) : null;
   const author = src ? (src.from==='me'?U.me.name:(U[src.from]||{name:src.from}).name) : '';
@@ -848,7 +848,7 @@ function pollCreateModal(){
   render();
   _ovClick=( e=>{
     if(e.target.closest('[data-addopt]')){ sync(); if(opts.length<6)opts.push(''); render(); return; }
-    if(e.target.closest('[data-pollcreate]')){ sync(); const question=q.trim()||'Опрос'; const clean=opts.map(o=>o.trim()).filter(Boolean); if(clean.length<2){ toast('Нужно минимум 2 варианта'); return; } const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(),from:'me',t:nowT(),poll:{q:question,options:clean.map(t=>({t,v:0})),total:0,voted:null},read:false}); c.last={by:'me',txt:'📊 '+question,t:nowT(),read:false}; closeOverlays(); renderConversation(); renderList(); toast('Опрос создан'); return; }
+    if(e.target.closest('[data-pollcreate]')){ sync(); const question=q.trim()||'Опрос'; const clean=opts.map(o=>o.trim()).filter(Boolean); if(clean.length<2){ toast('Нужно минимум 2 варианта'); return; } const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice(); const id='m'+uid(); th.push({id,from:'me',t:nowT(),poll:{q:question,options:clean.map(t=>({t,v:0})),total:0,voted:null},read:false}); c.last={by:'me',txt:'📊 '+question,t:nowT(),read:false}; closeOverlays(); renderConversation(); renderList(); $(`.msg[data-mid="${id}"]`)?.classList.add('msg-in'); toast('Опрос создан'); return; }
   });
 }
 
@@ -955,7 +955,7 @@ function send(){
   th.push(msg);
   c.last={by:'me',txt:v,t:nowT(),read:false}; S.reply=null;
   renderConversation(); renderList();
-  { const _sc=$('#scroll'); if(_sc) _sc.lastElementChild?.classList.add('msg-in'); }
+  $(`.msg[data-mid="${msg.id}"]`)?.classList.add('msg-in');  // animate the sent message (not the typing bubble below it)
   // fake delivered→read + a reply for demo liveliness
   setTimeout(()=>{ msg.sending=false; if(S.chatId===c.id) renderConversation(); }, 550);
   setTimeout(()=>{ msg.read=true; if(S.chatId===c.id) renderConversation(); }, 1700);
@@ -967,6 +967,8 @@ function toggleReact(mid, e){
   if(r){ if(r.mine){ r.by=r.by.filter(u=>u!=='me'); r.mine=false; if(!r.by.length) m.reacts=m.reacts.filter(x=>x!==r);} else { r.by.push('me'); r.mine=true; } }
   else m.reacts.push({e,by:['me'],mine:true});
   renderConversation();
+  const chip=$(`.msg[data-mid="${mid}"] .msg__react[data-react="${e}"]`);
+  if(chip && chip.classList.contains('is-mine')) chip.classList.add('react-pop');
 }
 function toggleInfo(v){ S.info = v!=null?v:!S.info; renderInfo(); syncURL(); if(innerWidth<=900&&S.info)$('#chatBody').setAttribute('data-mobile','info'); }
 function toggleTheme(){ const d=document.documentElement; const dark=d.getAttribute('data-theme')==='dark'; if(dark)d.removeAttribute('data-theme');else d.setAttribute('data-theme','dark'); localStorage.setItem('the-essence:theme',dark?'light':'dark'); }

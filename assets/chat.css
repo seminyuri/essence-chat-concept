@@ -557,6 +557,8 @@ html, body { height: 100%; overflow: hidden; }
 .msg__bubble--bare { background: none !important; border: none !important; box-shadow: none !important; padding: 0 2px !important; }
 .msg-in { animation: msg-in var(--motion-duration-base) var(--ease-spring); }
 @keyframes msg-in { from { opacity: 0; transform: translateY(9px) scale(.98); } to { opacity: 1; transform: none; } }
+.react-pop { animation: react-pop .34s var(--ease-spring); }
+@keyframes react-pop { 0% { transform: scale(.5); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
 /* lightbox (media viewer) */
 .lightbox { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 40px;
