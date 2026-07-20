@@ -552,6 +552,10 @@ html, body { height: 100%; overflow: hidden; }
                 transition: transform var(--motion-duration-fast) var(--ease-pop), background var(--motion-duration-fast) var(--motion-ease); }
 .ctx-react__e:hover { transform: scale(1.22); background: var(--color-bg-muted); }
 .ctx-react__more:hover { transform: scale(1.1); }
+/* .menu is position:absolute by default (essence). Inside any popover (.ov-pop —
+   context menu, chat «⋯», attach, send-options) it must stack in flow, else it
+   drops out, the popover measures 0 height, mis-clamps and clips off-screen. */
+.ov-pop .menu { position: static; }
 
 /* ════════════════════════ PINNED BAR / IN-CHAT SEARCH ════════════════════════ */
 .chat-pinned { position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 11px; padding: 7px 12px 7px 16px;
