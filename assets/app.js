@@ -8,6 +8,13 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const ic = (n, cls = '') => `<svg class="icon ${cls}"><use href="#i-${n}"/></svg>`;
 const uid = (() => { let n = 1000; return () => 'x' + (++n); })();
+const PHOTOS = [
+  'radial-gradient(120% 90% at 30% 18%, #F7E0BE, transparent 55%), linear-gradient(165deg, #E7B98E, #B0705A 55%, #6E4A38)',
+  'radial-gradient(120% 90% at 70% 18%, #CFE3F2, transparent 55%), linear-gradient(165deg, #93B4C9, #4F8290 55%, #2E4E58)',
+  'radial-gradient(120% 90% at 30% 22%, #E1EFD6, transparent 55%), linear-gradient(165deg, #A9C79A, #6E8B6A 55%, #46603E)',
+  'radial-gradient(120% 90% at 65% 18%, #F2D4DC, transparent 55%), linear-gradient(165deg, #D79FAD, #B0708A 55%, #7A4A5E)',
+];
+const photoBg = i => PHOTOS[((+i)||0) % PHOTOS.length];
 
 /* ─────────────────────────── SAMPLE WORLD ─────────────────────────── */
 const U = {
@@ -90,7 +97,7 @@ const MSGS = {
     { from:'anya', day:'Сегодня', t:'14:31', text:'Ссылка дошла ✅ Скинула ей ещё голосом — так теплее.' },
     { from:'me',   t:'14:34', text:'Красота. Прикладываю макет карточки клиента — глянь мету справа.',
       replyTo:{who:'Аня Северина', txt:'Ссылка дошла ✅'} },
-    { from:'me',   t:'14:35', media:{grad:'e'}, cap:'client-360.png' },
+    { from:'me',   t:'14:35', media:{photo:1}, cap:'client-360.png' },
     { from:'anya', t:'14:37', text:'Огонь. Забираю в поддержку.', reacts:[{e:'🔥', by:['me','vera'], mine:true}] },
     { from:'me',   t:'14:38', text:'Отправила Марии новую ссылку ✓', read:true },
     { from:'anya', t:'14:39', sticker:'🙏' },
@@ -140,7 +147,7 @@ const MSGS = {
   ],
   announce: [
     { from:'chan', day:'Вчера', t:'18:00', text:'🎉 Релиз v3 выкатили! Онбординг клиентов через чат — специалисты уже тестируют.', views:214, reacts:[{e:'🎉',by:['me','anya','mark'],mine:true},{e:'🔥',by:['vera'],mine:false}] },
-    { from:'chan', t:'18:02', media:{grad:'e'}, cap:'Новый экран приглашения клиента', views:201 },
+    { from:'chan', t:'18:02', media:{photo:0}, cap:'Новый экран приглашения клиента', views:201 },
     { from:'chan', day:'Сегодня', t:'10:00', text:'Напоминание: в пятницу общий созвон по итогам недели, 17:00.', views:158 },
   ],
 };
@@ -348,7 +355,7 @@ function renderMessages(c){
     if (m.replyTo){ const _tgt = m.replyTo.mid || (threadOf(c).find(x=>x.text && m.replyTo.txt && x.text.includes(m.replyTo.txt))||{}).id || ''; body += `<div class="msg__reply"${_tgt?` data-jumpreply="${_tgt}"`:''}><span class="msg__reply-bar"></span><div style="min-width:0"><div class="msg__reply-who">${esc(m.replyTo.who)}</div><div class="msg__reply-txt">${esc(m.replyTo.txt)}</div></div></div>`; }
     if (m.fwd) body += `<div class="msg__fwd">${ic('forward','icon--xs')} Переслано от <b>${esc(m.fwd)}</b></div>`;
     if (showAuthor) body = `<div class="msg__author msg__author${AUTHOR_CLASS[m.from]||''}">${esc(from.name)}</div>` + body;
-    if (m.media) body += `<div class="msg__media" data-grad="${m.media.grad}" style="cursor:zoom-in"><div style="aspect-ratio:16/10;background:linear-gradient(135deg,var(--cal-${m.media.grad==='e'?'amber':m.media.grad==='c'?'teal':'rose'}),var(--color-accent-strong))"></div></div>${m.cap?`<div class="msg__mediacap">${esc(m.cap)}</div>`:''}`;
+    if (m.media){ const pi = m.media.photo!=null ? m.media.photo : 0; body += `<div class="msg__media" data-photo="${pi}" title="Открыть на весь экран"><div style="aspect-ratio:4/3;background:${photoBg(pi)}"></div></div>${m.cap?`<div class="msg__mediacap">${esc(m.cap)}</div>`:''}`; }
     if (m.file) body += `<div class="msg__file"><span class="msg__file-ic">${ic('file')}</span><div style="min-width:0"><div class="msg__file-nm">${esc(m.file.name)}</div><div class="msg__file-sz">${esc(m.file.size)}</div></div><button class="shell-icon-btn">${ic('download','icon--sm')}</button></div>`;
     if (m.voice){
       const bars = m.voice.wave.map(h=>`<span style="height:${Math.max(20,h*3)}%"></span>`).join('');
@@ -491,10 +498,9 @@ function renderInfo(){
 /* ─────────────────────────── OVERLAYS ─────────────────────────── */
 const OV = $('#overlays');
 function closeOverlays(){ OV.innerHTML=''; }
-function lightbox(grad){
-  const g = grad==='e'?'amber':grad==='c'?'teal':grad==='d'?'blush':'rose';
+function lightbox(photo){
   const w = document.createElement('div'); w.className='lightbox';
-  w.innerHTML = `<button class="lightbox__close" data-lbclose>${ic('x')}</button><div class="lightbox__img" style="width:min(760px,90vw);aspect-ratio:16/10;background:linear-gradient(135deg,var(--cal-${g}),var(--color-accent-strong))"></div>`;
+  w.innerHTML = `<button class="lightbox__close" data-lbclose>${ic('x')}</button><div class="lightbox__img" style="width:min(880px,92vw);aspect-ratio:4/3;background:${photoBg(photo)}"></div>`;
   document.body.appendChild(w);
   w.addEventListener('click', e=>{ if(e.target.closest('[data-lbclose]')||e.target.classList.contains('lightbox')) w.remove(); });
 }
@@ -919,7 +925,7 @@ document.addEventListener('click', e=>{
     const ms=t.closest('.msg'); if(ms){ const id=ms.dataset.mid; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); ms.classList.toggle('is-selected'); const bn=$('#bulkN'); if(bn)bn.textContent=S.sel.size+' выбрано'; if(S.sel.size===0)exitSel(); return; }
   }
   { const jr=t.closest('[data-jumpreply]'); if(jr){ flashMsg(jr.dataset.jumpreply); return; } }
-  { const md=t.closest('.msg__media'); if(md && !S.selMode){ lightbox(md.dataset.grad); return; } }
+  { const md=t.closest('.msg__media'); if(md && !S.selMode){ lightbox(md.dataset.photo); return; } }
   { const vt=t.closest('[data-vote]'); if(vt){ const ms=t.closest('.msg'); if(ms)votePoll(ms.dataset.mid,+vt.dataset.vote); return; } }
   // info tabs
   const it=t.closest('[data-infotab]'); if(it){ S.infoTab=it.dataset.infotab; renderInfo(); return; }
@@ -992,11 +998,24 @@ function attachMenu(x,y){
     <button class="menu__item">${ic('map','icon--sm')} Геопозиция</button>
   </div>`, x, y-260);
   OV.addEventListener('click',e=>{ const it=e.target.closest('.menu__item'); if(!it) return; const label=it.textContent.trim(); closeOverlays();
+    if(/Фото/.test(label)){ photoPreview(); return; }
     const c=findChat(S.chatId); if(!c) return; const th=MSGS[c.id]=threadOf(c).slice();
-    if(/Фото/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),media:{grad:'c'},read:false}); c.last={by:'me',txt:'📷 Фото',t:nowT(),read:false}; }
-    else if(/Документ/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),file:{name:'Бриф.pdf',size:'2,4 МБ'},read:false}); c.last={by:'me',txt:'📎 Бриф.pdf',t:nowT(),read:false}; }
+    if(/Документ/.test(label)){ th.push({id:'m'+uid(),from:'me',t:nowT(),file:{name:'Бриф.pdf',size:'2,4 МБ'},read:false}); c.last={by:'me',txt:'📎 Бриф.pdf',t:nowT(),read:false}; }
     else { toast(label+' — в полной версии'); return; }
     renderConversation(); renderList(); const _sc=$('#scroll'); if(_sc) _sc.lastElementChild?.classList.add('msg-in'); toast('Отправлено');
+  });
+}
+/* photo preview before send */
+function photoPreview(){
+  const idx = Math.floor(Math.random()*PHOTOS.length);
+  modal(`<div class="modal__header"><div class="modal__title">Отправить фото</div><button class="modal__close" data-close>✕</button></div>
+    <div class="modal__body"><div style="background:${photoBg(idx)};aspect-ratio:4/3;border-radius:var(--radius-lg);margin-bottom:14px;box-shadow:var(--shadow-soft)"></div>
+      <input class="input" id="phcap" placeholder="Добавить подпись…"></div>
+    <div class="modal__footer"><button class="btn btn--ghost btn--md" data-close>Отмена</button><button class="btn btn--primary btn--md" data-phsend data-idx="${idx}">${ic('send','icon--sm')} Отправить</button></div>`,'md');
+  const inp=$('#phcap'); if(inp) inp.focus();
+  OV.addEventListener('click',e=>{ const b=e.target.closest('[data-phsend]'); if(!b) return; const cap=($('#phcap')?.value||'').trim(); const c=findChat(S.chatId); if(!c){closeOverlays();return;}
+    const th=MSGS[c.id]=threadOf(c).slice(); th.push({id:'m'+uid(),from:'me',t:nowT(),media:{photo:+b.dataset.idx},cap,read:false}); c.last={by:'me',txt:'📷 Фото'+(cap?' · '+cap:''),t:nowT(),read:false};
+    closeOverlays(); renderConversation(); renderList(); const _sc=$('#scroll'); if(_sc)_sc.lastElementChild?.classList.add('msg-in');
   });
 }
 
